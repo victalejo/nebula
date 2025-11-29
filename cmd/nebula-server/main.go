@@ -21,6 +21,7 @@ import (
 	"github.com/victalejo/nebula/internal/proxy/caddy"
 	"github.com/victalejo/nebula/internal/service"
 	"github.com/victalejo/nebula/internal/storage/sqlite"
+	"github.com/victalejo/nebula/internal/version"
 )
 
 func main() {
@@ -43,7 +44,7 @@ func main() {
 	}
 
 	log.Info("starting nebula server",
-		"version", "0.1.0",
+		"version", version.Version,
 		"host", cfg.Server.Host,
 		"port", cfg.Server.Port,
 	)
@@ -98,6 +99,9 @@ func main() {
 		AdminUsername: cfg.Auth.AdminUsername,
 		AdminPassword: cfg.Auth.AdminPassword,
 	}, appService, deployService, updateService, store.Settings(), log)
+
+	// Start background update checker
+	go updateService.StartBackgroundChecker(context.Background())
 
 	// Start server
 	go func() {
