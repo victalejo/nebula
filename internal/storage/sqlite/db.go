@@ -15,13 +15,14 @@ import (
 type Store struct {
 	db *sql.DB
 
-	apps        *AppRepository
-	deployments *DeploymentRepository
-	routes      *RouteRepository
-	containers  *ContainerRepository
-	databases   *DatabaseRepository
-	backups     *BackupRepository
-	settings    *SettingsRepository
+	apps          *AppRepository
+	deployments   *DeploymentRepository
+	routes        *RouteRepository
+	containers    *ContainerRepository
+	databases     *DatabaseRepository
+	backups       *BackupRepository
+	binaryBackups *BinaryBackupRepository
+	settings      *SettingsRepository
 }
 
 // NewStore creates a new SQLite store
@@ -50,6 +51,7 @@ func NewStore(dbPath string) (*Store, error) {
 	store.containers = NewContainerRepository(db)
 	store.databases = NewDatabaseRepository(db)
 	store.backups = NewBackupRepository(db)
+	store.binaryBackups = NewBinaryBackupRepository(db)
 	store.settings = NewSettingsRepository(db)
 
 	return store, nil
@@ -83,6 +85,11 @@ func (s *Store) Databases() storage.DatabaseRepository {
 // Backups returns the backup repository
 func (s *Store) Backups() storage.BackupRepository {
 	return s.backups
+}
+
+// BinaryBackups returns the binary backup repository
+func (s *Store) BinaryBackups() storage.BinaryBackupRepository {
+	return s.binaryBackups
 }
 
 // Settings returns the settings repository

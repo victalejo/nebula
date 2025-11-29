@@ -14,6 +14,7 @@ type Config struct {
 	Caddy    CaddyConfig    `mapstructure:"caddy"`
 	Log      LogConfig      `mapstructure:"log"`
 	Auth     AuthConfig     `mapstructure:"auth"`
+	Update   UpdateConfig   `mapstructure:"update"`
 }
 
 // ServerConfig holds HTTP server configuration
@@ -54,6 +55,12 @@ type AuthConfig struct {
 	AdminPassword string `mapstructure:"admin_password"`
 }
 
+// UpdateConfig holds auto-update configuration
+type UpdateConfig struct {
+	Mode          string `mapstructure:"mode"`           // "auto", "notify", "disabled"
+	CheckInterval int    `mapstructure:"check_interval"` // in minutes
+}
+
 // Load reads configuration from file and environment
 func Load(configPath string) (*Config, error) {
 	v := viper.New()
@@ -71,6 +78,8 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("auth.token_duration", 24)
 	v.SetDefault("auth.admin_username", "admin")
 	v.SetDefault("auth.admin_password", "admin")
+	v.SetDefault("update.mode", "notify")
+	v.SetDefault("update.check_interval", 1440)
 
 	// Config file
 	if configPath != "" {
@@ -130,6 +139,10 @@ func LoadDefault() *Config {
 			TokenDuration: 24,
 			AdminUsername: "admin",
 			AdminPassword: "admin",
+		},
+		Update: UpdateConfig{
+			Mode:          "notify",
+			CheckInterval: 1440,
 		},
 	}
 }

@@ -17,8 +17,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.buildTime={{.Date}}
+      - -X github.com/victalejo/nebula/internal/version.Version={{.Version}}
+      - -X github.com/victalejo/nebula/internal/version.BuildTime={{.Date}}
+      - -X github.com/victalejo/nebula/internal/version.Commit={{.ShortCommit}}
 
   - id: nebula-cli
     main: ./cmd/nebula
@@ -32,8 +33,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.buildTime={{.Date}}
+      - -X github.com/victalejo/nebula/internal/version.Version={{.Version}}
+      - -X github.com/victalejo/nebula/internal/version.BuildTime={{.Date}}
+      - -X github.com/victalejo/nebula/internal/version.Commit={{.ShortCommit}}
 
 archives:
   - format: binary

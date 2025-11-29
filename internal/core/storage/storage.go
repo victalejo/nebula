@@ -84,6 +84,15 @@ type DatabaseBackup struct {
 	CreatedAt  time.Time
 }
 
+// BinaryBackup represents a binary backup for rollback
+type BinaryBackup struct {
+	ID         string
+	Version    string
+	BinaryPath string
+	BinaryHash string
+	CreatedAt  time.Time
+}
+
 // AppRepository handles application persistence
 type AppRepository interface {
 	Create(ctx context.Context, app *Application) error
@@ -152,6 +161,14 @@ type SettingsRepository interface {
 	Delete(ctx context.Context, key string) error
 }
 
+// BinaryBackupRepository handles binary backup persistence for rollback
+type BinaryBackupRepository interface {
+	Create(ctx context.Context, backup *BinaryBackup) error
+	Get(ctx context.Context, id string) (*BinaryBackup, error)
+	Delete(ctx context.Context, id string) error
+	List(ctx context.Context) ([]*BinaryBackup, error)
+}
+
 // Store provides access to all repositories
 type Store interface {
 	Apps() AppRepository
@@ -160,6 +177,7 @@ type Store interface {
 	Containers() ContainerRepository
 	Databases() DatabaseRepository
 	Backups() BackupRepository
+	BinaryBackups() BinaryBackupRepository
 	Settings() SettingsRepository
 	Close() error
 	Migrate() error
