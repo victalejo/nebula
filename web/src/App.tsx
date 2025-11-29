@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AppDetail from './pages/AppDetail';
 import Settings from './pages/Settings';
+import UpdateBanner from './components/UpdateBanner';
 
 type Route = 'dashboard' | 'app-detail' | 'settings';
 
@@ -39,6 +40,7 @@ const App: Component = () => {
         fallback={<Login />}
       >
         <div class="min-h-screen bg-gray-50">
+          <UpdateBanner />
           <Header onNavigate={navigateToDashboard} onSettings={navigateToSettings} />
           <main class="max-w-7xl mx-auto px-4 py-8">
             <Show when={route() === 'dashboard'}>

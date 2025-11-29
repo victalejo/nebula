@@ -1,5 +1,6 @@
-import { Component, createSignal, onMount } from 'solid-js';
+import { Component, createSignal, onMount, Show, For } from 'solid-js';
 import api from '../api/client';
+import { updateStore } from '../stores/update';
 
 interface SettingsProps {
   onBack: () => void;
