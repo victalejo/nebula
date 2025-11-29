@@ -48,6 +48,12 @@ type DeployImageRequest struct {
 	Environment  map[string]string `json:"environment"`
 }
 
+// DeployGitRequest represents a request to deploy from Git repository
+type DeployGitRequest struct {
+	Branch      string            `json:"branch"`
+	Environment map[string]string `json:"environment"`
+}
+
 // RegistryAuthReq represents registry authentication
 type RegistryAuthReq struct {
 	Username string `json:"username"`
@@ -71,10 +77,16 @@ func (s *DeployService) DeployImage(ctx context.Context, appID string, req Deplo
 		"image", req.Image,
 	)
 
-	// Get the application
+	// Get the application - try by ID first, then by name
 	app, err := s.store.Apps().GetByID(ctx, appID)
 	if err != nil {
 		return nil, apperrors.NewInternalError("failed to get application", err)
+	}
+	if app == nil {
+		app, err = s.store.Apps().GetByName(ctx, appID)
+		if err != nil {
+			return nil, apperrors.NewInternalError("failed to get application", err)
+		}
 	}
 	if app == nil {
 		return nil, apperrors.NewNotFoundError("application", appID)
@@ -92,7 +104,7 @@ func (s *DeployService) DeployImage(ctx context.Context, appID string, req Deplo
 	}
 
 	// Determine target slot (opposite of current active)
-	targetSlot := s.getTargetSlot(ctx, appID)
+	targetSlot := s.getTargetSlot(ctx, app.ID)
 
 	// Build source config
 	sourceConfig := deployer.SourceConfig{
@@ -120,7 +132,7 @@ func (s *DeployService) DeployImage(ctx context.Context, appID string, req Deplo
 
 	// Create deployment spec
 	spec := &deployer.DeploymentSpec{
-		AppID:       appID,
+		AppID:       app.ID,
 		Source:      sourceConfig,
 		Environment: env,
 		TargetSlot:  targetSlot,
@@ -139,7 +151,7 @@ func (s *DeployService) DeployImage(ctx context.Context, appID string, req Deplo
 
 	deployment := &storage.Deployment{
 		ID:           uuid.New().String(),
-		AppID:        appID,
+		AppID:        app.ID,
 		Version:      fmt.Sprintf("v%d", time.Now().Unix()),
 		Slot:         string(targetSlot),
 		Status:       string(deployer.StatusPending),
@@ -153,6 +165,113 @@ func (s *DeployService) DeployImage(ctx context.Context, appID string, req Deplo
 
 	// Execute deployment asynchronously
 	go s.executeDeployment(context.Background(), app, deployment, imageDeployer, spec)
+
+	return &DeploymentResponse{
+		ID:        deployment.ID,
+		AppID:     deployment.AppID,
+		Version:   deployment.Version,
+		Slot:      deployment.Slot,
+		Status:    deployment.Status,
+		CreatedAt: deployment.CreatedAt.Format("2006-01-02T15:04:05Z"),
+	}, nil
+}
+
+// DeployGit deploys an application from a Git repository
+func (s *DeployService) DeployGit(ctx context.Context, appID string, req DeployGitRequest) (*DeploymentResponse, error) {
+	s.log.Info("starting git deployment", "app_id", appID)
+
+	// Get the application - try by ID first, then by name
+	app, err := s.store.Apps().GetByID(ctx, appID)
+	if err != nil {
+		return nil, apperrors.NewInternalError("failed to get application", err)
+	}
+	if app == nil {
+		app, err = s.store.Apps().GetByName(ctx, appID)
+		if err != nil {
+			return nil, apperrors.NewInternalError("failed to get application", err)
+		}
+	}
+	if app == nil {
+		return nil, apperrors.NewNotFoundError("application", appID)
+	}
+
+	// Validate deployment mode
+	if app.DeploymentMode != string(deployer.ModeGit) {
+		return nil, apperrors.NewValidationError("application is not configured for git deployment", nil)
+	}
+
+	// Validate git repo is configured
+	if app.GitRepo == "" {
+		return nil, apperrors.NewValidationError("git repository URL is not configured for this application", nil)
+	}
+
+	// Get the git deployer
+	gitDeployer, err := s.registry.Get(deployer.ModeGit)
+	if err != nil {
+		return nil, apperrors.NewInternalError("git deployer not available", err)
+	}
+
+	// Determine target slot
+	targetSlot := s.getTargetSlot(ctx, app.ID)
+
+	// Determine branch
+	branch := req.Branch
+	if branch == "" {
+		branch = app.GitBranch
+	}
+	if branch == "" {
+		branch = "main"
+	}
+
+	// Merge environment variables
+	env := make(map[string]string)
+	if app.Environment != "" {
+		json.Unmarshal([]byte(app.Environment), &env)
+	}
+	for k, v := range req.Environment {
+		env[k] = v
+	}
+
+	// Create deployment spec
+	spec := &deployer.DeploymentSpec{
+		AppID:       app.ID,
+		AppName:     app.Name,
+		GitRepo:     app.GitRepo,
+		GitBranch:   branch,
+		Environment: env,
+		TargetSlot:  targetSlot,
+	}
+
+	// Validate
+	if err := gitDeployer.Validate(ctx, spec); err != nil {
+		return nil, apperrors.NewValidationError("invalid deployment spec", map[string]interface{}{
+			"error": err.Error(),
+		})
+	}
+
+	// Create deployment record
+	sourceJSON, _ := json.Marshal(map[string]string{
+		"git_repo":   app.GitRepo,
+		"git_branch": branch,
+	})
+	envJSON, _ := json.Marshal(env)
+
+	deployment := &storage.Deployment{
+		ID:           uuid.New().String(),
+		AppID:        app.ID,
+		Version:      fmt.Sprintf("v%d", time.Now().Unix()),
+		Slot:         string(targetSlot),
+		Status:       string(deployer.StatusPending),
+		SourceConfig: string(sourceJSON),
+		Environment:  string(envJSON),
+	}
+
+	if err := s.store.Deployments().Create(ctx, deployment); err != nil {
+		return nil, apperrors.NewInternalError("failed to create deployment record", err)
+	}
+
+	// Execute deployment asynchronously
+	go s.executeDeployment(context.Background(), app, deployment, gitDeployer, spec)
 
 	return &DeploymentResponse{
 		ID:        deployment.ID,
@@ -352,8 +471,23 @@ func (s *DeployService) GetDeployment(ctx context.Context, id string) (*Deployme
 }
 
 // ListDeployments returns all deployments for an application
-func (s *DeployService) ListDeployments(ctx context.Context, appID string) ([]*DeploymentResponse, error) {
-	deployments, err := s.store.Deployments().ListByAppID(ctx, appID)
+func (s *DeployService) ListDeployments(ctx context.Context, appIDOrName string) ([]*DeploymentResponse, error) {
+	// Resolve app ID from name if needed
+	app, err := s.store.Apps().GetByID(ctx, appIDOrName)
+	if err != nil {
+		return nil, apperrors.NewInternalError("failed to get application", err)
+	}
+	if app == nil {
+		app, err = s.store.Apps().GetByName(ctx, appIDOrName)
+		if err != nil {
+			return nil, apperrors.NewInternalError("failed to get application", err)
+		}
+	}
+	if app == nil {
+		return nil, apperrors.NewNotFoundError("application", appIDOrName)
+	}
+
+	deployments, err := s.store.Deployments().ListByAppID(ctx, app.ID)
 	if err != nil {
 		return nil, apperrors.NewInternalError("failed to list deployments", err)
 	}

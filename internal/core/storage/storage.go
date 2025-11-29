@@ -11,6 +11,9 @@ type Application struct {
 	Name           string
 	DeploymentMode string
 	Domain         string
+	GitRepo        string
+	GitBranch      string
+	DockerImage    string
 	Environment    string // JSON encoded
 	CreatedAt      time.Time
 	UpdatedAt      time.Time

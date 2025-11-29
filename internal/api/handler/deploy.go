@@ -47,6 +47,30 @@ func (h *DeployHandler) DeployImage(c *gin.Context) {
 	})
 }
 
+// DeployGit deploys an application from a Git repository
+func (h *DeployHandler) DeployGit(c *gin.Context) {
+	appID := c.Param("id")
+
+	var req service.DeployGitRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid request body: " + err.Error(),
+		})
+		return
+	}
+
+	deployment, err := h.deployService.DeployGit(c.Request.Context(), appID, req)
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"data":    deployment,
+		"message": "deployment started",
+	})
+}
+
 // ListDeployments returns all deployments for an application
 func (h *DeployHandler) ListDeployments(c *gin.Context) {
 	appID := c.Param("id")

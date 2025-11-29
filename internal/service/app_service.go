@@ -31,6 +31,9 @@ type CreateAppRequest struct {
 	Name           string                  `json:"name" binding:"required"`
 	DeploymentMode deployer.DeploymentMode `json:"deployment_mode" binding:"required"`
 	Domain         string                  `json:"domain"`
+	GitRepo        string                  `json:"git_repo"`
+	GitBranch      string                  `json:"git_branch"`
+	DockerImage    string                  `json:"docker_image"`
 	Environment    map[string]string       `json:"environment"`
 }
 
@@ -40,6 +43,9 @@ type AppResponse struct {
 	Name           string                  `json:"name"`
 	DeploymentMode deployer.DeploymentMode `json:"deployment_mode"`
 	Domain         string                  `json:"domain"`
+	GitRepo        string                  `json:"git_repo,omitempty"`
+	GitBranch      string                  `json:"git_branch,omitempty"`
+	DockerImage    string                  `json:"docker_image,omitempty"`
 	Environment    map[string]string       `json:"environment"`
 	CreatedAt      string                  `json:"created_at"`
 	UpdatedAt      string                  `json:"updated_at"`
@@ -83,6 +89,9 @@ func (s *AppService) Create(ctx context.Context, req CreateAppRequest) (*AppResp
 		Name:           req.Name,
 		DeploymentMode: string(req.DeploymentMode),
 		Domain:         req.Domain,
+		GitRepo:        req.GitRepo,
+		GitBranch:      req.GitBranch,
+		DockerImage:    req.DockerImage,
 		Environment:    envJSON,
 	}
 
@@ -231,6 +240,9 @@ func (s *AppService) toResponse(app *storage.Application) *AppResponse {
 		Name:           app.Name,
 		DeploymentMode: deployer.DeploymentMode(app.DeploymentMode),
 		Domain:         app.Domain,
+		GitRepo:        app.GitRepo,
+		GitBranch:      app.GitBranch,
+		DockerImage:    app.DockerImage,
 		Environment:    env,
 		CreatedAt:      app.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:      app.UpdatedAt.Format("2006-01-02T15:04:05Z"),

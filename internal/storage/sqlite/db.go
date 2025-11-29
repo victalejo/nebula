@@ -90,14 +90,20 @@ func (s *Store) Close() error {
 
 // Migrate runs database migrations
 func (s *Store) Migrate() error {
-	migrations := []string{
-		migrationV1,
+	// Run V1 migration (creates tables if not exist)
+	if _, err := s.db.Exec(migrationV1); err != nil {
+		return fmt.Errorf("failed to run migration V1: %w", err)
 	}
 
-	for i, migration := range migrations {
-		if _, err := s.db.Exec(migration); err != nil {
-			return fmt.Errorf("failed to run migration %d: %w", i+1, err)
-		}
+	// Run V2 migration (adds columns - ignore errors if columns exist)
+	v2Columns := []string{
+		"ALTER TABLE applications ADD COLUMN git_repo TEXT",
+		"ALTER TABLE applications ADD COLUMN git_branch TEXT",
+		"ALTER TABLE applications ADD COLUMN docker_image TEXT",
+	}
+	for _, col := range v2Columns {
+		// Ignore errors - column might already exist
+		s.db.Exec(col)
 	}
 
 	return nil

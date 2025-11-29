@@ -2,6 +2,7 @@ import { Component, createSignal, onMount, For, Show } from 'solid-js';
 import api, { App, Deployment } from '../api/client';
 import DeployModal from '../components/DeployModal';
 import LogViewer from '../components/LogViewer';
+import DeploymentLogsModal from '../components/DeploymentLogsModal';
 
 interface AppDetailProps {
   appName: string;
@@ -15,6 +16,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
   const [activeTab, setActiveTab] = createSignal<'overview' | 'deployments' | 'logs'>('overview');
   const [showDeployModal, setShowDeployModal] = createSignal(false);
   const [deleting, setDeleting] = createSignal(false);
+  const [selectedDeploymentLogs, setSelectedDeploymentLogs] = createSignal<Deployment | null>(null);
 
   const fetchData = async () => {
     try {
@@ -231,6 +233,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
                       <th class="pb-3">Slot</th>
                       <th class="pb-3">Estado</th>
                       <th class="pb-3">Creado</th>
+                      <th class="pb-3">Acciones</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y">
@@ -256,6 +259,15 @@ const AppDetail: Component<AppDetailProps> = (props) => {
                           <td class="py-3 text-sm text-gray-500">
                             {new Date(deployment.created_at).toLocaleString()}
                           </td>
+                          <td class="py-3">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedDeploymentLogs(deployment)}
+                              class="text-sm text-nebula-600 hover:text-nebula-700 font-medium"
+                            >
+                              Ver Logs
+                            </button>
+                          </td>
                         </tr>
                       )}
                     </For>
@@ -274,6 +286,15 @@ const AppDetail: Component<AppDetailProps> = (props) => {
               app={app()!}
               onClose={() => setShowDeployModal(false)}
               onDeployed={handleDeploy}
+            />
+          </Show>
+
+          <Show when={selectedDeploymentLogs()}>
+            <DeploymentLogsModal
+              appName={props.appName}
+              deploymentId={selectedDeploymentLogs()!.id}
+              deploymentVersion={selectedDeploymentLogs()!.version}
+              onClose={() => setSelectedDeploymentLogs(null)}
             />
           </Show>
         </div>

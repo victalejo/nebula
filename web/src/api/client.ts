@@ -125,6 +125,14 @@ class ApiClient {
     return result.data;
   }
 
+  async deployGit(appName: string, data: DeployGitRequest): Promise<Deployment> {
+    const result = await this.post<ApiResponse<Deployment>>(
+      `/apps/${appName}/deploy/git`,
+      data
+    );
+    return result.data;
+  }
+
   // Logs - returns EventSource for SSE
   streamLogs(
     appName: string,
@@ -134,8 +142,26 @@ class ApiClient {
     if (options.follow) params.set('follow', 'true');
     if (options.tail) params.set('tail', options.tail.toString());
     if (options.service) params.set('service', options.service);
+    // EventSource doesn't support Authorization headers, so pass token as query param
+    if (this.token) params.set('token', this.token);
 
     const url = `${API_BASE}/apps/${appName}/logs?${params.toString()}`;
+    const eventSource = new EventSource(url);
+    return eventSource;
+  }
+
+  // Deployment Logs - returns EventSource for SSE
+  streamDeploymentLogs(
+    appName: string,
+    deploymentId: string,
+    options: { follow?: boolean; tail?: number } = {}
+  ): EventSource {
+    const params = new URLSearchParams();
+    if (options.follow) params.set('follow', 'true');
+    if (options.tail) params.set('tail', options.tail.toString());
+    if (this.token) params.set('token', this.token);
+
+    const url = `${API_BASE}/apps/${appName}/deployments/${deploymentId}/logs?${params.toString()}`;
     const eventSource = new EventSource(url);
     return eventSource;
   }
@@ -179,10 +205,19 @@ export interface CreateAppRequest {
 }
 
 export interface DeployImageRequest {
-  image: string;
+  image: string;  // Can include tag like "nginx:latest"
   port: number;
   registry?: string;
+  registry_auth?: {
+    username: string;
+    password: string;
+  };
   pull_policy?: string;
+  environment?: Record<string, string>;
+}
+
+export interface DeployGitRequest {
+  branch?: string;
   environment?: Record<string, string>;
 }
 

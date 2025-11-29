@@ -122,12 +122,14 @@ func (s *Server) setupRoutes() {
 	// Deployment routes
 	deployHandler := handler.NewDeployHandler(s.deployService, s.log)
 	protected.POST("/apps/:id/deploy/image", deployHandler.DeployImage)
+	protected.POST("/apps/:id/deploy/git", deployHandler.DeployGit)
 	protected.GET("/apps/:id/deployments", deployHandler.ListDeployments)
 	protected.GET("/apps/:id/deployments/:did", deployHandler.GetDeployment)
 
 	// Log routes
 	logHandler := handler.NewLogHandler(s.log)
 	protected.GET("/apps/:id/logs", logHandler.StreamLogs)
+	protected.GET("/apps/:id/deployments/:did/logs", logHandler.StreamDeploymentLogs)
 }
 
 // Start starts the HTTP server

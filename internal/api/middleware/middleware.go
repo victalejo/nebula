@@ -54,24 +54,31 @@ func CORS() gin.HandlerFunc {
 // Auth returns an authentication middleware
 func Auth(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var tokenString string
+
+		// First try Authorization header
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		if authHeader != "" {
+			// Extract token from "Bearer <token>"
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+					"error": "invalid authorization header format",
+				})
+				return
+			}
+			tokenString = parts[1]
+		} else {
+			// Fallback to query parameter (for SSE/EventSource which can't send headers)
+			tokenString = c.Query("token")
+		}
+
+		if tokenString == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "authorization header required",
+				"error": "authorization required",
 			})
 			return
 		}
-
-		// Extract token from "Bearer <token>"
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "invalid authorization header format",
-			})
-			return
-		}
-
-		tokenString := parts[1]
 
 		// Parse and validate token
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {

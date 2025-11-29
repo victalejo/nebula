@@ -21,8 +21,8 @@ func NewAppRepository(db *sql.DB) *AppRepository {
 // Create creates a new application
 func (r *AppRepository) Create(ctx context.Context, app *storage.Application) error {
 	query := `
-		INSERT INTO applications (id, name, deployment_mode, domain, environment, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO applications (id, name, deployment_mode, domain, git_repo, git_branch, docker_image, environment, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
 	app.CreatedAt = now
@@ -33,6 +33,9 @@ func (r *AppRepository) Create(ctx context.Context, app *storage.Application) er
 		app.Name,
 		app.DeploymentMode,
 		app.Domain,
+		nullString(app.GitRepo),
+		nullString(app.GitBranch),
+		nullString(app.DockerImage),
 		app.Environment,
 		app.CreatedAt,
 		app.UpdatedAt,
@@ -40,19 +43,30 @@ func (r *AppRepository) Create(ctx context.Context, app *storage.Application) er
 	return err
 }
 
+func nullString(s string) sql.NullString {
+	if s == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: s, Valid: true}
+}
+
 // GetByID retrieves an application by ID
 func (r *AppRepository) GetByID(ctx context.Context, id string) (*storage.Application, error) {
 	query := `
-		SELECT id, name, deployment_mode, domain, environment, created_at, updated_at
+		SELECT id, name, deployment_mode, domain, git_repo, git_branch, docker_image, environment, created_at, updated_at
 		FROM applications
 		WHERE id = ?
 	`
 	app := &storage.Application{}
+	var gitRepo, gitBranch, dockerImage sql.NullString
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&app.ID,
 		&app.Name,
 		&app.DeploymentMode,
 		&app.Domain,
+		&gitRepo,
+		&gitBranch,
+		&dockerImage,
 		&app.Environment,
 		&app.CreatedAt,
 		&app.UpdatedAt,
@@ -63,22 +77,29 @@ func (r *AppRepository) GetByID(ctx context.Context, id string) (*storage.Applic
 	if err != nil {
 		return nil, err
 	}
+	app.GitRepo = gitRepo.String
+	app.GitBranch = gitBranch.String
+	app.DockerImage = dockerImage.String
 	return app, nil
 }
 
 // GetByName retrieves an application by name
 func (r *AppRepository) GetByName(ctx context.Context, name string) (*storage.Application, error) {
 	query := `
-		SELECT id, name, deployment_mode, domain, environment, created_at, updated_at
+		SELECT id, name, deployment_mode, domain, git_repo, git_branch, docker_image, environment, created_at, updated_at
 		FROM applications
 		WHERE name = ?
 	`
 	app := &storage.Application{}
+	var gitRepo, gitBranch, dockerImage sql.NullString
 	err := r.db.QueryRowContext(ctx, query, name).Scan(
 		&app.ID,
 		&app.Name,
 		&app.DeploymentMode,
 		&app.Domain,
+		&gitRepo,
+		&gitBranch,
+		&dockerImage,
 		&app.Environment,
 		&app.CreatedAt,
 		&app.UpdatedAt,
@@ -89,6 +110,9 @@ func (r *AppRepository) GetByName(ctx context.Context, name string) (*storage.Ap
 	if err != nil {
 		return nil, err
 	}
+	app.GitRepo = gitRepo.String
+	app.GitBranch = gitBranch.String
+	app.DockerImage = dockerImage.String
 	return app, nil
 }
 
@@ -96,7 +120,7 @@ func (r *AppRepository) GetByName(ctx context.Context, name string) (*storage.Ap
 func (r *AppRepository) Update(ctx context.Context, app *storage.Application) error {
 	query := `
 		UPDATE applications
-		SET name = ?, deployment_mode = ?, domain = ?, environment = ?, updated_at = ?
+		SET name = ?, deployment_mode = ?, domain = ?, git_repo = ?, git_branch = ?, docker_image = ?, environment = ?, updated_at = ?
 		WHERE id = ?
 	`
 	app.UpdatedAt = time.Now()
@@ -104,6 +128,9 @@ func (r *AppRepository) Update(ctx context.Context, app *storage.Application) er
 		app.Name,
 		app.DeploymentMode,
 		app.Domain,
+		nullString(app.GitRepo),
+		nullString(app.GitBranch),
+		nullString(app.DockerImage),
 		app.Environment,
 		app.UpdatedAt,
 		app.ID,
@@ -121,7 +148,7 @@ func (r *AppRepository) Delete(ctx context.Context, id string) error {
 // List returns all applications
 func (r *AppRepository) List(ctx context.Context) ([]*storage.Application, error) {
 	query := `
-		SELECT id, name, deployment_mode, domain, environment, created_at, updated_at
+		SELECT id, name, deployment_mode, domain, git_repo, git_branch, docker_image, environment, created_at, updated_at
 		FROM applications
 		ORDER BY created_at DESC
 	`
@@ -134,17 +161,24 @@ func (r *AppRepository) List(ctx context.Context) ([]*storage.Application, error
 	var apps []*storage.Application
 	for rows.Next() {
 		app := &storage.Application{}
+		var gitRepo, gitBranch, dockerImage sql.NullString
 		if err := rows.Scan(
 			&app.ID,
 			&app.Name,
 			&app.DeploymentMode,
 			&app.Domain,
+			&gitRepo,
+			&gitBranch,
+			&dockerImage,
 			&app.Environment,
 			&app.CreatedAt,
 			&app.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
+		app.GitRepo = gitRepo.String
+		app.GitBranch = gitBranch.String
+		app.DockerImage = dockerImage.String
 		apps = append(apps, app)
 	}
 	return apps, rows.Err()
