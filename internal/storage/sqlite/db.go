@@ -205,4 +205,14 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS binary_backups (
+    id TEXT PRIMARY KEY,
+    version TEXT NOT NULL,
+    binary_path TEXT NOT NULL,
+    binary_hash TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_binary_backups_version ON binary_backups(version);
 `
