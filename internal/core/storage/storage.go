@@ -145,6 +145,13 @@ type BackupRepository interface {
 	ListByDatabaseID(ctx context.Context, databaseID string) ([]*DatabaseBackup, error)
 }
 
+// SettingsRepository handles system settings persistence
+type SettingsRepository interface {
+	Get(ctx context.Context, key string) (string, error)
+	Set(ctx context.Context, key, value string) error
+	Delete(ctx context.Context, key string) error
+}
+
 // Store provides access to all repositories
 type Store interface {
 	Apps() AppRepository
@@ -153,6 +160,7 @@ type Store interface {
 	Containers() ContainerRepository
 	Databases() DatabaseRepository
 	Backups() BackupRepository
+	Settings() SettingsRepository
 	Close() error
 	Migrate() error
 }

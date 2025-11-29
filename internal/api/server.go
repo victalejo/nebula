@@ -12,6 +12,7 @@ import (
 	"github.com/victalejo/nebula/internal/api/handler"
 	"github.com/victalejo/nebula/internal/api/middleware"
 	"github.com/victalejo/nebula/internal/core/logger"
+	"github.com/victalejo/nebula/internal/core/storage"
 	"github.com/victalejo/nebula/internal/service"
 	"github.com/victalejo/nebula/web"
 )
@@ -33,6 +34,7 @@ type Server struct {
 	httpServer    *http.Server
 	appService    *service.AppService
 	deployService *service.DeployService
+	settingsStore storage.SettingsRepository
 	log           logger.Logger
 }
 
@@ -41,6 +43,7 @@ func NewServer(
 	config ServerConfig,
 	appService *service.AppService,
 	deployService *service.DeployService,
+	settingsStore storage.SettingsRepository,
 	log logger.Logger,
 ) *Server {
 	// Set Gin mode
@@ -53,6 +56,7 @@ func NewServer(
 		router:        router,
 		appService:    appService,
 		deployService: deployService,
+		settingsStore: settingsStore,
 		log:           log,
 	}
 
@@ -130,6 +134,12 @@ func (s *Server) setupRoutes() {
 	logHandler := handler.NewLogHandler(s.log)
 	protected.GET("/apps/:id/logs", logHandler.StreamLogs)
 	protected.GET("/apps/:id/deployments/:did/logs", logHandler.StreamDeploymentLogs)
+
+	// Settings routes
+	settingsHandler := handler.NewSettingsHandler(s.settingsStore, s.log)
+	protected.GET("/settings/github-token", settingsHandler.GetGitHubTokenStatus)
+	protected.PUT("/settings/github-token", settingsHandler.SetGitHubToken)
+	protected.DELETE("/settings/github-token", settingsHandler.DeleteGitHubToken)
 }
 
 // Start starts the HTTP server

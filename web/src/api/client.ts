@@ -165,6 +165,19 @@ class ApiClient {
     const eventSource = new EventSource(url);
     return eventSource;
   }
+
+  // Settings
+  async getGitHubTokenStatus(): Promise<GitHubTokenStatus> {
+    return this.get<GitHubTokenStatus>('/settings/github-token');
+  }
+
+  async setGitHubToken(token: string): Promise<{ message: string }> {
+    return this.put<{ message: string }>('/settings/github-token', { token });
+  }
+
+  async deleteGitHubToken(): Promise<{ message: string }> {
+    return this.delete<{ message: string }>('/settings/github-token');
+  }
 }
 
 // Types
@@ -219,6 +232,10 @@ export interface DeployImageRequest {
 export interface DeployGitRequest {
   branch?: string;
   environment?: Record<string, string>;
+}
+
+export interface GitHubTokenStatus {
+  configured: boolean;
 }
 
 export const api = new ApiClient();

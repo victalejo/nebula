@@ -14,6 +14,7 @@ import (
 	"github.com/victalejo/nebula/internal/container"
 	"github.com/victalejo/nebula/internal/core/deployer"
 	"github.com/victalejo/nebula/internal/core/logger"
+	"github.com/victalejo/nebula/internal/core/storage"
 )
 
 // BuildpackConfig represents buildpack detection configuration
@@ -114,19 +115,42 @@ type Deployer struct {
 	log        logger.Logger
 	dataDir    string
 	buildpacks []BuildpackConfig
+	settings   storage.SettingsRepository
 }
 
-func New(runtime container.Runtime, log logger.Logger, dataDir string) *Deployer {
+func New(runtime container.Runtime, log logger.Logger, dataDir string, settings storage.SettingsRepository) *Deployer {
 	return &Deployer{
 		runtime:    runtime,
 		log:        log,
 		dataDir:    dataDir,
 		buildpacks: defaultBuildpacks,
+		settings:   settings,
 	}
 }
 
 func (d *Deployer) Mode() deployer.DeploymentMode {
 	return deployer.ModeGit
+}
+
+// injectGitHubToken modifies a GitHub HTTPS URL to include authentication token
+// Input:  https://github.com/user/repo.git
+// Output: https://x-access-token:{token}@github.com/user/repo.git
+func (d *Deployer) injectGitHubToken(repoURL, token string) string {
+	if token == "" {
+		return repoURL
+	}
+
+	// Only inject for GitHub HTTPS URLs
+	if strings.HasPrefix(repoURL, "https://github.com/") {
+		return strings.Replace(
+			repoURL,
+			"https://github.com/",
+			fmt.Sprintf("https://x-access-token:%s@github.com/", token),
+			1,
+		)
+	}
+
+	return repoURL
 }
 
 func (d *Deployer) Validate(ctx context.Context, spec *deployer.DeploymentSpec) error {
@@ -159,16 +183,28 @@ func (d *Deployer) Prepare(ctx context.Context, spec *deployer.DeploymentSpec) (
 		branch = "main"
 	}
 
-	cloneCmd := exec.CommandContext(ctx, "git", "clone", "--depth=1", "--branch", branch, spec.GitRepo, buildDir)
+	// Get GitHub token if available and inject into URL
+	cloneURL := spec.GitRepo
+	githubToken, _ := d.settings.Get(ctx, "github_token")
+	if githubToken != "" {
+		cloneURL = d.injectGitHubToken(spec.GitRepo, githubToken)
+	}
+
+	cloneCmd := exec.CommandContext(ctx, "git", "clone", "--depth=1", "--branch", branch, cloneURL, buildDir)
 	cloneOutput, err := cloneCmd.CombinedOutput()
 	if err != nil {
 		// Try with master branch if main fails
 		if branch == "main" {
-			cloneCmd = exec.CommandContext(ctx, "git", "clone", "--depth=1", "--branch", "master", spec.GitRepo, buildDir)
+			cloneCmd = exec.CommandContext(ctx, "git", "clone", "--depth=1", "--branch", "master", cloneURL, buildDir)
 			cloneOutput, err = cloneCmd.CombinedOutput()
 		}
 		if err != nil {
-			return nil, fmt.Errorf("failed to clone repository: %w\n%s", err, string(cloneOutput))
+			// Sanitize error message to avoid leaking token
+			sanitizedOutput := string(cloneOutput)
+			if githubToken != "" {
+				sanitizedOutput = strings.ReplaceAll(sanitizedOutput, githubToken, "[REDACTED]")
+			}
+			return nil, fmt.Errorf("failed to clone repository: %w\n%s", err, sanitizedOutput)
 		}
 	}
 

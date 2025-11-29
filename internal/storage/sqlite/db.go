@@ -21,6 +21,7 @@ type Store struct {
 	containers  *ContainerRepository
 	databases   *DatabaseRepository
 	backups     *BackupRepository
+	settings    *SettingsRepository
 }
 
 // NewStore creates a new SQLite store
@@ -49,6 +50,7 @@ func NewStore(dbPath string) (*Store, error) {
 	store.containers = NewContainerRepository(db)
 	store.databases = NewDatabaseRepository(db)
 	store.backups = NewBackupRepository(db)
+	store.settings = NewSettingsRepository(db)
 
 	return store, nil
 }
@@ -81,6 +83,11 @@ func (s *Store) Databases() storage.DatabaseRepository {
 // Backups returns the backup repository
 func (s *Store) Backups() storage.BackupRepository {
 	return s.backups
+}
+
+// Settings returns the settings repository
+func (s *Store) Settings() storage.SettingsRepository {
+	return s.settings
 }
 
 // Close closes the database connection
@@ -185,4 +192,10 @@ CREATE INDEX IF NOT EXISTS idx_deployments_status ON deployments(status);
 CREATE INDEX IF NOT EXISTS idx_containers_deployment_id ON containers(deployment_id);
 CREATE INDEX IF NOT EXISTS idx_databases_app_id ON databases(app_id);
 CREATE INDEX IF NOT EXISTS idx_backups_database_id ON database_backups(database_id);
+
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 `
