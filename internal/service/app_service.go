@@ -95,14 +95,24 @@ func (s *AppService) Create(ctx context.Context, req CreateAppRequest) (*AppResp
 	return s.toResponse(app), nil
 }
 
-// Get retrieves an application by ID
-func (s *AppService) Get(ctx context.Context, id string) (*AppResponse, error) {
-	app, err := s.store.Apps().GetByID(ctx, id)
+// Get retrieves an application by ID or name
+func (s *AppService) Get(ctx context.Context, idOrName string) (*AppResponse, error) {
+	// Try by ID first
+	app, err := s.store.Apps().GetByID(ctx, idOrName)
 	if err != nil {
 		return nil, apperrors.NewInternalError("failed to get application", err)
 	}
+
+	// If not found by ID, try by name
 	if app == nil {
-		return nil, apperrors.NewNotFoundError("application", id)
+		app, err = s.store.Apps().GetByName(ctx, idOrName)
+		if err != nil {
+			return nil, apperrors.NewInternalError("failed to get application", err)
+		}
+	}
+
+	if app == nil {
+		return nil, apperrors.NewNotFoundError("application", idOrName)
 	}
 
 	return s.toResponse(app), nil
@@ -143,13 +153,21 @@ type UpdateAppRequest struct {
 }
 
 // Update updates an application
-func (s *AppService) Update(ctx context.Context, id string, req UpdateAppRequest) (*AppResponse, error) {
-	app, err := s.store.Apps().GetByID(ctx, id)
+func (s *AppService) Update(ctx context.Context, idOrName string, req UpdateAppRequest) (*AppResponse, error) {
+	// Try by ID first
+	app, err := s.store.Apps().GetByID(ctx, idOrName)
 	if err != nil {
 		return nil, apperrors.NewInternalError("failed to get application", err)
 	}
+	// If not found by ID, try by name
 	if app == nil {
-		return nil, apperrors.NewNotFoundError("application", id)
+		app, err = s.store.Apps().GetByName(ctx, idOrName)
+		if err != nil {
+			return nil, apperrors.NewInternalError("failed to get application", err)
+		}
+	}
+	if app == nil {
+		return nil, apperrors.NewNotFoundError("application", idOrName)
 	}
 
 	if req.Domain != nil {
@@ -174,22 +192,30 @@ func (s *AppService) Update(ctx context.Context, id string, req UpdateAppRequest
 }
 
 // Delete deletes an application
-func (s *AppService) Delete(ctx context.Context, id string) error {
-	app, err := s.store.Apps().GetByID(ctx, id)
+func (s *AppService) Delete(ctx context.Context, idOrName string) error {
+	// Try by ID first
+	app, err := s.store.Apps().GetByID(ctx, idOrName)
 	if err != nil {
 		return apperrors.NewInternalError("failed to get application", err)
 	}
+	// If not found by ID, try by name
 	if app == nil {
-		return apperrors.NewNotFoundError("application", id)
+		app, err = s.store.Apps().GetByName(ctx, idOrName)
+		if err != nil {
+			return apperrors.NewInternalError("failed to get application", err)
+		}
+	}
+	if app == nil {
+		return apperrors.NewNotFoundError("application", idOrName)
 	}
 
 	// TODO: Stop and remove containers, delete routes
 
-	if err := s.store.Apps().Delete(ctx, id); err != nil {
+	if err := s.store.Apps().Delete(ctx, app.ID); err != nil {
 		return apperrors.NewInternalError("failed to delete application", err)
 	}
 
-	s.log.Info("application deleted", "id", id)
+	s.log.Info("application deleted", "id", app.ID)
 
 	return nil
 }

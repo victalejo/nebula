@@ -288,12 +288,15 @@ main() {
     create_systemd_service
     configure_firewall
 
+    # Get server IP
+    SERVER_IP=$(hostname -I | awk '{print $1}')
+
     echo ""
     log "Installation complete!"
     echo ""
     echo "Next steps:"
-    echo "  1. Configure your DNS to point to this server"
-    echo "  2. Login with: nebula login http://localhost:8080"
+    echo "  1. Configure your DNS to point to this server ($SERVER_IP)"
+    echo "  2. Login with: nebula login http://$SERVER_IP:8080"
     echo "  3. Create your first app: nebula apps create myapp --mode docker_image"
     echo ""
     echo "Useful commands:"

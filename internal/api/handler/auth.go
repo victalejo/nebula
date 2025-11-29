@@ -14,14 +14,18 @@ import (
 type AuthHandler struct {
 	jwtSecret     string
 	tokenDuration time.Duration
+	adminUsername string
+	adminPassword string
 	log           logger.Logger
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(jwtSecret string, tokenDuration time.Duration, log logger.Logger) *AuthHandler {
+func NewAuthHandler(jwtSecret string, tokenDuration time.Duration, adminUsername, adminPassword string, log logger.Logger) *AuthHandler {
 	return &AuthHandler{
 		jwtSecret:     jwtSecret,
 		tokenDuration: tokenDuration,
+		adminUsername: adminUsername,
+		adminPassword: adminPassword,
 		log:           log,
 	}
 }
@@ -48,9 +52,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// TODO: Implement proper user authentication
-	// For now, use a simple hardcoded check for development
-	if req.Username != "admin" || req.Password != "admin" {
+	// Validate credentials against configured admin user
+	if req.Username != h.adminUsername || req.Password != h.adminPassword {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "invalid credentials",
 		})
@@ -139,4 +142,14 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 
 func isExpiredError(err error) bool {
 	return err.Error() == "token has invalid claims: token is expired"
+}
+
+// Me returns the current user info
+func (h *AuthHandler) Me(c *gin.Context) {
+	username, exists := c.Get("username")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"username": username})
 }

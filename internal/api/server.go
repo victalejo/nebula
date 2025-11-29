@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/victalejo/nebula/internal/api/middleware"
 	"github.com/victalejo/nebula/internal/core/logger"
 	"github.com/victalejo/nebula/internal/service"
+	"github.com/victalejo/nebula/web"
 )
 
 // ServerConfig holds server configuration
@@ -20,6 +22,8 @@ type ServerConfig struct {
 	Port          int
 	JWTSecret     string
 	TokenDuration time.Duration
+	AdminUsername string
+	AdminPassword string
 }
 
 // Server represents the API server
@@ -75,17 +79,37 @@ func (s *Server) setupRoutes() {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy"})
 	})
 
+	// Serve embedded frontend
+	frontendFS, err := web.GetFS()
+	if err == nil {
+		s.router.StaticFS("/assets", http.FS(mustSub(frontendFS, "assets")))
+		s.router.GET("/", func(c *gin.Context) {
+			c.FileFromFS("/", http.FS(frontendFS))
+		})
+		s.router.NoRoute(func(c *gin.Context) {
+			// SPA fallback - serve index.html for non-API routes
+			if len(c.Request.URL.Path) > 4 && c.Request.URL.Path[:5] == "/api/" {
+				c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+				return
+			}
+			c.FileFromFS("/", http.FS(frontendFS))
+		})
+	}
+
 	// API v1
 	v1 := s.router.Group("/api/v1")
 
 	// Auth routes (no auth required)
-	authHandler := handler.NewAuthHandler(s.config.JWTSecret, s.config.TokenDuration, s.log)
+	authHandler := handler.NewAuthHandler(s.config.JWTSecret, s.config.TokenDuration, s.config.AdminUsername, s.config.AdminPassword, s.log)
 	v1.POST("/auth/login", authHandler.Login)
 	v1.POST("/auth/refresh", authHandler.Refresh)
 
 	// Protected routes
 	protected := v1.Group("")
 	protected.Use(middleware.Auth(s.config.JWTSecret))
+
+	// Auth routes (protected)
+	protected.GET("/auth/me", authHandler.Me)
 
 	// App routes
 	appHandler := handler.NewAppHandler(s.appService, s.log)
@@ -121,4 +145,12 @@ func (s *Server) Start() error {
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
+}
+
+func mustSub(fsys fs.FS, dir string) fs.FS {
+	sub, err := fs.Sub(fsys, dir)
+	if err != nil {
+		panic(err)
+	}
+	return sub
 }

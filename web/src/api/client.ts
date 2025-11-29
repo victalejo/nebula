@@ -77,17 +77,16 @@ class ApiClient {
 
   // Auth
   async login(username: string, password: string): Promise<{ token: string }> {
-    const result = await this.post<ApiResponse<{ token: string }>>('/auth/login', {
+    const result = await this.post<{ token: string; expires_at: string }>('/auth/login', {
       username,
       password,
     });
-    this.setToken(result.data.token);
-    return result.data;
+    this.setToken(result.token);
+    return result;
   }
 
   async getUser(): Promise<{ username: string }> {
-    const result = await this.get<ApiResponse<{ username: string }>>('/auth/me');
-    return result.data;
+    return this.get<{ username: string }>('/auth/me');
   }
 
   // Apps
@@ -181,8 +180,10 @@ export interface CreateAppRequest {
 
 export interface DeployImageRequest {
   image: string;
-  tag?: string;
-  env_vars?: Record<string, string>;
+  port: number;
+  registry?: string;
+  pull_policy?: string;
+  environment?: Record<string, string>;
 }
 
 export const api = new ApiClient();

@@ -50,6 +50,8 @@ type LogConfig struct {
 type AuthConfig struct {
 	JWTSecret     string `mapstructure:"jwt_secret"`
 	TokenDuration int    `mapstructure:"token_duration"` // in hours
+	AdminUsername string `mapstructure:"admin_username"`
+	AdminPassword string `mapstructure:"admin_password"`
 }
 
 // Load reads configuration from file and environment
@@ -67,6 +69,8 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.format", "json")
 	v.SetDefault("auth.token_duration", 24)
+	v.SetDefault("auth.admin_username", "admin")
+	v.SetDefault("auth.admin_password", "admin")
 
 	// Config file
 	if configPath != "" {
@@ -124,6 +128,8 @@ func LoadDefault() *Config {
 		Auth: AuthConfig{
 			JWTSecret:     "change-me-in-production",
 			TokenDuration: 24,
+			AdminUsername: "admin",
+			AdminPassword: "admin",
 		},
 	}
 }

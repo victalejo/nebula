@@ -10,6 +10,7 @@ interface DeployModalProps {
 const DeployModal: Component<DeployModalProps> = (props) => {
   const [image, setImage] = createSignal(props.app.docker_image || '');
   const [tag, setTag] = createSignal('latest');
+  const [port, setPort] = createSignal(80);
   const [envVars, setEnvVars] = createSignal<Array<{ key: string; value: string }>>(
     Object.entries(props.app.env_vars || {}).map(([key, value]) => ({ key, value }))
   );
@@ -44,8 +45,9 @@ const DeployModal: Component<DeployModalProps> = (props) => {
 
     const data: DeployImageRequest = {
       image: image(),
+      port: port(),
       tag: tag() || undefined,
-      env_vars: Object.keys(envVarsObj).length > 0 ? envVarsObj : undefined,
+      environment: Object.keys(envVarsObj).length > 0 ? envVarsObj : undefined,
     };
 
     try {
@@ -93,6 +95,21 @@ const DeployModal: Component<DeployModalProps> = (props) => {
                 class="input"
                 placeholder="latest"
               />
+            </div>
+
+            <div>
+              <label class="label">Container Port</label>
+              <input
+                type="number"
+                value={port()}
+                onInput={(e) => setPort(parseInt(e.currentTarget.value) || 80)}
+                class="input"
+                placeholder="80"
+                min="1"
+                max="65535"
+                required
+              />
+              <p class="text-xs text-gray-500 mt-1">The port your application listens on inside the container</p>
             </div>
           </Show>
 
