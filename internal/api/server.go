@@ -34,6 +34,7 @@ type Server struct {
 	httpServer    *http.Server
 	appService    *service.AppService
 	deployService *service.DeployService
+	updateService *service.UpdateService
 	settingsStore storage.SettingsRepository
 	log           logger.Logger
 }
@@ -43,6 +44,7 @@ func NewServer(
 	config ServerConfig,
 	appService *service.AppService,
 	deployService *service.DeployService,
+	updateService *service.UpdateService,
 	settingsStore storage.SettingsRepository,
 	log logger.Logger,
 ) *Server {
@@ -56,6 +58,7 @@ func NewServer(
 		router:        router,
 		appService:    appService,
 		deployService: deployService,
+		updateService: updateService,
 		settingsStore: settingsStore,
 		log:           log,
 	}
@@ -86,8 +89,14 @@ func (s *Server) setupRoutes() {
 	// Serve embedded frontend
 	frontendFS, err := web.GetFS()
 	if err == nil {
+		// Assets with cache busting (filename has hash)
 		s.router.StaticFS("/assets", http.FS(mustSub(frontendFS, "assets")))
+
+		// Index.html - no cache to ensure latest version
 		s.router.GET("/", func(c *gin.Context) {
+			c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+			c.Header("Pragma", "no-cache")
+			c.Header("Expires", "0")
 			c.FileFromFS("/", http.FS(frontendFS))
 		})
 		s.router.NoRoute(func(c *gin.Context) {
@@ -96,6 +105,9 @@ func (s *Server) setupRoutes() {
 				c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 				return
 			}
+			c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+			c.Header("Pragma", "no-cache")
+			c.Header("Expires", "0")
 			c.FileFromFS("/", http.FS(frontendFS))
 		})
 	}
@@ -140,6 +152,17 @@ func (s *Server) setupRoutes() {
 	protected.GET("/settings/github-token", settingsHandler.GetGitHubTokenStatus)
 	protected.PUT("/settings/github-token", settingsHandler.SetGitHubToken)
 	protected.DELETE("/settings/github-token", settingsHandler.DeleteGitHubToken)
+
+	// System/Update routes
+	updateHandler := handler.NewUpdateHandler(s.updateService, s.log)
+	protected.GET("/system/info", updateHandler.GetSystemInfo)
+	protected.GET("/system/updates", updateHandler.GetUpdateStatus)
+	protected.POST("/system/updates/check", updateHandler.CheckForUpdates)
+	protected.POST("/system/updates/apply", updateHandler.ApplyUpdate)
+	protected.GET("/system/updates/config", updateHandler.GetConfiguration)
+	protected.PUT("/system/updates/config", updateHandler.UpdateConfiguration)
+	protected.GET("/system/backups", updateHandler.ListBackups)
+	protected.POST("/system/rollback/:id", updateHandler.Rollback)
 }
 
 // Start starts the HTTP server

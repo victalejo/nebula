@@ -87,6 +87,7 @@ func main() {
 	// Initialize services
 	appService := service.NewAppService(store, log)
 	deployService := service.NewDeployService(store, registry, proxyManager, log)
+	updateService := service.NewUpdateService(cfg.Update, store, log)
 
 	// Initialize API server
 	server := api.NewServer(api.ServerConfig{
@@ -96,7 +97,7 @@ func main() {
 		TokenDuration: time.Duration(cfg.Auth.TokenDuration) * time.Hour,
 		AdminUsername: cfg.Auth.AdminUsername,
 		AdminPassword: cfg.Auth.AdminPassword,
-	}, appService, deployService, store.Settings(), log)
+	}, appService, deployService, updateService, store.Settings(), log)
 
 	// Start server
 	go func() {
