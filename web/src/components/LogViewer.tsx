@@ -117,11 +117,11 @@ const LogViewer: Component<LogViewerProps> = (props) => {
               }`}
             ></span>
             <span class="text-sm text-gray-600">
-              {connected() ? 'Connected' : 'Disconnected'}
+              {connected() ? 'Conectado' : 'Desconectado'}
             </span>
           </div>
           <span class="text-sm text-gray-400">|</span>
-          <span class="text-sm text-gray-600">{logs().length} lines</span>
+          <span class="text-sm text-gray-600">{logs().length} líneas</span>
         </div>
 
         <div class="flex items-center space-x-3">
@@ -130,7 +130,7 @@ const LogViewer: Component<LogViewerProps> = (props) => {
             value={filter()}
             onInput={(e) => setFilter(e.currentTarget.value)}
             class="px-3 py-1 text-sm border rounded-lg w-48"
-            placeholder="Filter logs..."
+            placeholder="Filtrar registros..."
           />
           <label class="flex items-center space-x-2 text-sm text-gray-600">
             <input
@@ -145,7 +145,7 @@ const LogViewer: Component<LogViewerProps> = (props) => {
             onClick={clearLogs}
             class="text-sm text-gray-500 hover:text-gray-700"
           >
-            Clear
+            Limpiar
           </button>
         </div>
       </div>
@@ -168,7 +168,7 @@ const LogViewer: Component<LogViewerProps> = (props) => {
 
         {logs().length === 0 && (
           <div class="text-gray-500 text-center py-8">
-            Waiting for logs...
+            Esperando registros...
           </div>
         )}
       </div>

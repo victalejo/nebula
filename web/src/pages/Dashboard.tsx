@@ -62,8 +62,8 @@ const Dashboard: Component<DashboardProps> = (props) => {
     <div>
       <div class="flex items-center justify-between mb-8">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Applications</h1>
-          <p class="text-gray-600">Manage your deployed applications</p>
+          <h1 class="text-2xl font-bold text-gray-900">Aplicaciones</h1>
+          <p class="text-gray-600">Gestiona tus aplicaciones desplegadas</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
@@ -72,7 +72,7 @@ const Dashboard: Component<DashboardProps> = (props) => {
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
           </svg>
-          <span>New App</span>
+          <span>Nueva App</span>
         </button>
       </div>
 
@@ -99,7 +99,7 @@ const Dashboard: Component<DashboardProps> = (props) => {
                       </div>
                     </div>
                     <span class={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(app)}`}>
-                      Active
+                      Activo
                     </span>
                   </div>
                   {app.domain && (
@@ -108,7 +108,7 @@ const Dashboard: Component<DashboardProps> = (props) => {
                     </p>
                   )}
                   <p class="text-xs text-gray-400 mt-2">
-                    Created {new Date(app.created_at).toLocaleDateString()}
+                    Creado {new Date(app.created_at).toLocaleDateString()}
                   </p>
                 </button>
               )}
@@ -151,10 +151,10 @@ const EmptyState: Component<{ onCreateClick: () => void }> = (props) => (
     <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
     </svg>
-    <h3 class="text-lg font-medium text-gray-900 mb-2">No applications yet</h3>
-    <p class="text-gray-600 mb-6">Get started by creating your first application</p>
+    <h3 class="text-lg font-medium text-gray-900 mb-2">Sin aplicaciones</h3>
+    <p class="text-gray-600 mb-6">Comienza creando tu primera aplicación</p>
     <button onClick={props.onCreateClick} class="btn btn-primary">
-      Create Application
+      Crear Aplicación
     </button>
   </div>
 );

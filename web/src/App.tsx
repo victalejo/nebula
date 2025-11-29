@@ -55,7 +55,7 @@ const LoadingScreen: Component = () => (
   <div class="min-h-screen bg-gray-50 flex items-center justify-center">
     <div class="text-center">
       <div class="w-12 h-12 border-4 border-nebula-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-      <p class="mt-4 text-gray-600">Loading...</p>
+      <p class="mt-4 text-gray-600">Cargando...</p>
     </div>
   </div>
 );
@@ -83,7 +83,7 @@ const Header: Component<{ onNavigate: () => void }> = (props) => {
             onClick={() => authStore.logout()}
             class="text-sm text-gray-500 hover:text-gray-700"
           >
-            Logout
+            Cerrar sesión
           </button>
         </div>
       </div>

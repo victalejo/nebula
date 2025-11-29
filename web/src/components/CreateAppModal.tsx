@@ -48,7 +48,7 @@ const CreateAppModal: Component<CreateAppModalProps> = (props) => {
     <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
         <div class="flex items-center justify-between p-6 border-b">
-          <h2 class="text-lg font-semibold">Create Application</h2>
+          <h2 class="text-lg font-semibold">Crear Aplicación</h2>
           <button onClick={props.onClose} class="text-gray-400 hover:text-gray-600">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -58,46 +58,46 @@ const CreateAppModal: Component<CreateAppModalProps> = (props) => {
 
         <form onSubmit={handleSubmit} class="p-6 space-y-4">
           <div>
-            <label class="label">App Name</label>
+            <label class="label">Nombre de App</label>
             <input
               type="text"
               value={name()}
               onInput={(e) => setName(e.currentTarget.value)}
               class="input"
-              placeholder="my-app"
+              placeholder="mi-app"
               pattern="[a-z0-9-]+"
               required
             />
-            <p class="text-xs text-gray-500 mt-1">Lowercase letters, numbers, and hyphens only</p>
+            <p class="text-xs text-gray-500 mt-1">Solo letras minúsculas, números y guiones</p>
           </div>
 
           <div>
-            <label class="label">Deployment Mode</label>
+            <label class="label">Modo de Despliegue</label>
             <select
               value={mode()}
               onChange={(e) => setMode(e.currentTarget.value as any)}
               class="input"
             >
-              <option value="docker_image">Docker Image</option>
-              <option value="git">Git Repository</option>
+              <option value="docker_image">Imagen Docker</option>
+              <option value="git">Repositorio Git</option>
               <option value="docker_compose">Docker Compose</option>
             </select>
           </div>
 
           <div>
-            <label class="label">Domain (optional)</label>
+            <label class="label">Dominio (opcional)</label>
             <input
               type="text"
               value={domain()}
               onInput={(e) => setDomain(e.currentTarget.value)}
               class="input"
-              placeholder="myapp.example.com"
+              placeholder="miapp.ejemplo.com"
             />
           </div>
 
           <Show when={mode() === 'docker_image'}>
             <div>
-              <label class="label">Docker Image</label>
+              <label class="label">Imagen Docker</label>
               <input
                 type="text"
                 value={image()}
@@ -110,17 +110,17 @@ const CreateAppModal: Component<CreateAppModalProps> = (props) => {
 
           <Show when={mode() === 'git'}>
             <div>
-              <label class="label">Git Repository URL</label>
+              <label class="label">URL del Repositorio Git</label>
               <input
                 type="url"
                 value={gitRepo()}
                 onInput={(e) => setGitRepo(e.currentTarget.value)}
                 class="input"
-                placeholder="https://github.com/user/repo"
+                placeholder="https://github.com/usuario/repo"
               />
             </div>
             <div>
-              <label class="label">Branch</label>
+              <label class="label">Rama</label>
               <input
                 type="text"
                 value={gitBranch()}
@@ -143,14 +143,14 @@ const CreateAppModal: Component<CreateAppModalProps> = (props) => {
               onClick={props.onClose}
               class="btn btn-secondary"
             >
-              Cancel
+              Cancelar
             </button>
             <button
               type="submit"
               disabled={loading()}
               class="btn btn-primary disabled:opacity-50"
             >
-              {loading() ? 'Creating...' : 'Create App'}
+              {loading() ? 'Creando...' : 'Crear App'}
             </button>
           </div>
         </form>

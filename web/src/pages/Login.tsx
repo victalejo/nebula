@@ -24,12 +24,12 @@ const Login: Component = () => {
             <circle cx="12" cy="12" r="3" />
           </svg>
           <h1 class="text-2xl font-bold text-gray-900 mt-4">Nebula</h1>
-          <p class="text-gray-600">Lightweight PaaS</p>
+          <p class="text-gray-600">PaaS Ligero</p>
         </div>
 
         <form onSubmit={handleSubmit} class="space-y-4">
           <div>
-            <label class="label">Username</label>
+            <label class="label">Usuario</label>
             <input
               type="text"
               value={username()}
@@ -41,7 +41,7 @@ const Login: Component = () => {
           </div>
 
           <div>
-            <label class="label">Password</label>
+            <label class="label">Contraseña</label>
             <input
               type="password"
               value={password()}
@@ -63,7 +63,7 @@ const Login: Component = () => {
             disabled={authStore.loading()}
             class="btn btn-primary w-full disabled:opacity-50"
           >
-            {authStore.loading() ? 'Signing in...' : 'Sign In'}
+            {authStore.loading() ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
         </form>
       </div>

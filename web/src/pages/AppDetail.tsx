@@ -39,7 +39,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Are you sure you want to delete ${props.appName}? This cannot be undone.`)) {
+    if (!confirm(`¿Estás seguro de que deseas eliminar ${props.appName}? Esta acción no se puede deshacer.`)) {
       return;
     }
 
@@ -48,7 +48,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
       await api.deleteApp(props.appName);
       props.onBack();
     } catch (e) {
-      alert('Failed to delete app');
+      alert('Error al eliminar la aplicación');
     } finally {
       setDeleting(false);
     }
@@ -105,14 +105,14 @@ const AppDetail: Component<AppDetailProps> = (props) => {
                 onClick={() => setShowDeployModal(true)}
                 class="btn btn-primary"
               >
-                Deploy
+                Desplegar
               </button>
               <button
                 onClick={handleDelete}
                 disabled={deleting()}
                 class="btn btn-danger"
               >
-                {deleting() ? 'Deleting...' : 'Delete'}
+                {deleting() ? 'Eliminando...' : 'Eliminar'}
               </button>
             </div>
           </div>
@@ -124,19 +124,19 @@ const AppDetail: Component<AppDetailProps> = (props) => {
                 active={activeTab() === 'overview'}
                 onClick={() => setActiveTab('overview')}
               >
-                Overview
+                General
               </TabButton>
               <TabButton
                 active={activeTab() === 'deployments'}
                 onClick={() => setActiveTab('deployments')}
               >
-                Deployments
+                Despliegues
               </TabButton>
               <TabButton
                 active={activeTab() === 'logs'}
                 onClick={() => setActiveTab('logs')}
               >
-                Logs
+                Registros
               </TabButton>
             </nav>
           </div>
@@ -146,21 +146,21 @@ const AppDetail: Component<AppDetailProps> = (props) => {
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* App Info */}
               <div class="card">
-                <h3 class="font-semibold text-gray-900 mb-4">Application Info</h3>
+                <h3 class="font-semibold text-gray-900 mb-4">Info de Aplicación</h3>
                 <dl class="space-y-3">
-                  <InfoRow label="Mode" value={app()!.deployment_mode} />
-                  <InfoRow label="Domain" value={app()!.domain || 'Not set'} />
+                  <InfoRow label="Modo" value={app()!.deployment_mode} />
+                  <InfoRow label="Dominio" value={app()!.domain || 'No configurado'} />
                   {app()!.docker_image && (
-                    <InfoRow label="Image" value={app()!.docker_image!} />
+                    <InfoRow label="Imagen" value={app()!.docker_image!} />
                   )}
                   {app()!.git_repo && (
                     <>
-                      <InfoRow label="Repository" value={app()!.git_repo!} />
-                      <InfoRow label="Branch" value={app()!.git_branch || 'main'} />
+                      <InfoRow label="Repositorio" value={app()!.git_repo!} />
+                      <InfoRow label="Rama" value={app()!.git_branch || 'main'} />
                     </>
                   )}
                   <InfoRow
-                    label="Created"
+                    label="Creado"
                     value={new Date(app()!.created_at).toLocaleString()}
                   />
                 </dl>
@@ -168,17 +168,17 @@ const AppDetail: Component<AppDetailProps> = (props) => {
 
               {/* Current Deployment */}
               <div class="card">
-                <h3 class="font-semibold text-gray-900 mb-4">Current Deployment</h3>
+                <h3 class="font-semibold text-gray-900 mb-4">Despliegue Actual</h3>
                 <Show
                   when={getCurrentDeployment()}
-                  fallback={<p class="text-gray-500">No running deployment</p>}
+                  fallback={<p class="text-gray-500">Sin despliegue activo</p>}
                 >
                   {(deployment) => (
                     <dl class="space-y-3">
-                      <InfoRow label="Version" value={deployment().version} />
+                      <InfoRow label="Versión" value={deployment().version} />
                       <InfoRow label="Slot" value={deployment().slot} />
                       <InfoRow
-                        label="Status"
+                        label="Estado"
                         value={
                           <span class="flex items-center space-x-2">
                             {getStatusIcon(deployment().status)}
@@ -187,7 +187,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
                         }
                       />
                       <InfoRow
-                        label="Deployed"
+                        label="Desplegado"
                         value={new Date(deployment().created_at).toLocaleString()}
                       />
                     </dl>
@@ -197,10 +197,10 @@ const AppDetail: Component<AppDetailProps> = (props) => {
 
               {/* Environment Variables */}
               <div class="card lg:col-span-2">
-                <h3 class="font-semibold text-gray-900 mb-4">Environment Variables</h3>
+                <h3 class="font-semibold text-gray-900 mb-4">Variables de Entorno</h3>
                 <Show
                   when={Object.keys(app()!.env_vars || {}).length > 0}
-                  fallback={<p class="text-gray-500">No environment variables set</p>}
+                  fallback={<p class="text-gray-500">Sin variables de entorno</p>}
                 >
                   <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm">
                     <For each={Object.entries(app()!.env_vars || {})}>
@@ -222,15 +222,15 @@ const AppDetail: Component<AppDetailProps> = (props) => {
             <div class="card">
               <Show
                 when={deployments().length > 0}
-                fallback={<p class="text-gray-500 text-center py-8">No deployments yet</p>}
+                fallback={<p class="text-gray-500 text-center py-8">Sin despliegues</p>}
               >
                 <table class="w-full">
                   <thead>
                     <tr class="text-left text-sm text-gray-500 border-b">
-                      <th class="pb-3">Version</th>
+                      <th class="pb-3">Versión</th>
                       <th class="pb-3">Slot</th>
-                      <th class="pb-3">Status</th>
-                      <th class="pb-3">Created</th>
+                      <th class="pb-3">Estado</th>
+                      <th class="pb-3">Creado</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y">

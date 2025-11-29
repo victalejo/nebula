@@ -1,5 +1,5 @@
 import { Component, createSignal, Show, For } from 'solid-js';
-import api, { App, DeployImageRequest } from '../api/client';
+import api, { App, DeployImageRequest, DeployGitRequest } from '../api/client';
 
 interface DeployModalProps {
   app: App;
@@ -43,15 +43,24 @@ const DeployModal: Component<DeployModalProps> = (props) => {
       }
     }
 
-    const data: DeployImageRequest = {
-      image: image(),
-      port: port(),
-      tag: tag() || undefined,
-      environment: Object.keys(envVarsObj).length > 0 ? envVarsObj : undefined,
-    };
-
     try {
-      await api.deployImage(props.app.name, data);
+      if (props.app.deployment_mode === 'docker_image') {
+        // Combine image and tag
+        const fullImage = tag() ? `${image()}:${tag()}` : image();
+
+        const data: DeployImageRequest = {
+          image: fullImage,
+          port: port(),
+          environment: Object.keys(envVarsObj).length > 0 ? envVarsObj : undefined,
+        };
+        await api.deployImage(props.app.name, data);
+      } else if (props.app.deployment_mode === 'git') {
+        const data: DeployGitRequest = {
+          branch: props.app.git_branch || 'main',
+          environment: Object.keys(envVarsObj).length > 0 ? envVarsObj : undefined,
+        };
+        await api.deployGit(props.app.name, data);
+      }
       props.onDeployed();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Deployment failed');
@@ -64,7 +73,7 @@ const DeployModal: Component<DeployModalProps> = (props) => {
     <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between p-6 border-b sticky top-0 bg-white">
-          <h2 class="text-lg font-semibold">Deploy {props.app.name}</h2>
+          <h2 class="text-lg font-semibold">Desplegar {props.app.name}</h2>
           <button onClick={props.onClose} class="text-gray-400 hover:text-gray-600">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -75,7 +84,7 @@ const DeployModal: Component<DeployModalProps> = (props) => {
         <form onSubmit={handleSubmit} class="p-6 space-y-4">
           <Show when={props.app.deployment_mode === 'docker_image'}>
             <div>
-              <label class="label">Docker Image</label>
+              <label class="label">Imagen Docker</label>
               <input
                 type="text"
                 value={image()}
@@ -87,7 +96,7 @@ const DeployModal: Component<DeployModalProps> = (props) => {
             </div>
 
             <div>
-              <label class="label">Tag</label>
+              <label class="label">Etiqueta</label>
               <input
                 type="text"
                 value={tag()}
@@ -98,7 +107,7 @@ const DeployModal: Component<DeployModalProps> = (props) => {
             </div>
 
             <div>
-              <label class="label">Container Port</label>
+              <label class="label">Puerto del Contenedor</label>
               <input
                 type="number"
                 value={port()}
@@ -109,27 +118,27 @@ const DeployModal: Component<DeployModalProps> = (props) => {
                 max="65535"
                 required
               />
-              <p class="text-xs text-gray-500 mt-1">The port your application listens on inside the container</p>
+              <p class="text-xs text-gray-500 mt-1">El puerto en el que escucha tu aplicación dentro del contenedor</p>
             </div>
           </Show>
 
           <Show when={props.app.deployment_mode === 'git'}>
             <div class="bg-blue-50 text-blue-700 px-4 py-3 rounded-lg text-sm">
-              This will pull the latest code from <strong>{props.app.git_repo}</strong>
-              (branch: {props.app.git_branch || 'main'}) and rebuild the application.
+              Esto descargará el código más reciente de <strong>{props.app.git_repo}</strong>
+              (rama: {props.app.git_branch || 'main'}) y reconstruirá la aplicación.
             </div>
           </Show>
 
           {/* Environment Variables */}
           <div>
             <div class="flex items-center justify-between mb-2">
-              <label class="label mb-0">Environment Variables</label>
+              <label class="label mb-0">Variables de Entorno</label>
               <button
                 type="button"
                 onClick={addEnvVar}
                 class="text-sm text-nebula-600 hover:text-nebula-700"
               >
-                + Add Variable
+                + Agregar Variable
               </button>
             </div>
 
@@ -142,14 +151,14 @@ const DeployModal: Component<DeployModalProps> = (props) => {
                       value={envVar.key}
                       onInput={(e) => updateEnvVar(index(), 'key', e.currentTarget.value)}
                       class="input flex-1"
-                      placeholder="KEY"
+                      placeholder="CLAVE"
                     />
                     <input
                       type="text"
                       value={envVar.value}
                       onInput={(e) => updateEnvVar(index(), 'value', e.currentTarget.value)}
                       class="input flex-1"
-                      placeholder="value"
+                      placeholder="valor"
                     />
                     <button
                       type="button"
@@ -178,14 +187,14 @@ const DeployModal: Component<DeployModalProps> = (props) => {
               onClick={props.onClose}
               class="btn btn-secondary"
             >
-              Cancel
+              Cancelar
             </button>
             <button
               type="submit"
               disabled={loading()}
               class="btn btn-primary disabled:opacity-50"
             >
-              {loading() ? 'Deploying...' : 'Deploy'}
+              {loading() ? 'Desplegando...' : 'Desplegar'}
             </button>
           </div>
         </form>

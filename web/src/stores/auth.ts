@@ -15,7 +15,7 @@ function createAuthStore() {
       setIsAuthenticated(true);
       await fetchUser();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Login failed');
+      setError(e instanceof Error ? e.message : 'Error de inicio de sesión');
       throw e;
     } finally {
       setLoading(false);
