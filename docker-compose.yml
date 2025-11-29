@@ -1,0 +1,65 @@
+# Nebula PaaS - Self-hosted deployment
+# Usage: docker compose up -d
+
+version: '3.8'
+
+services:
+  nebula:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nebula-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - nebula-data:/data
+    environment:
+      - NEBULA_DATA_DIR=/data
+      - NEBULA_JWT_SECRET=${JWT_SECRET:-changeme}
+      - NEBULA_ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - NEBULA_CADDY_ADMIN_URL=http://caddy:2019
+    depends_on:
+      - caddy
+    networks:
+      - nebula-internal
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: nebula-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - nebula-internal
+      - nebula-apps
+
+  # Optional: Web UI
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: nebula-web
+    restart: unless-stopped
+    depends_on:
+      - nebula
+    networks:
+      - nebula-internal
+
+volumes:
+  nebula-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  nebula-internal:
+    driver: bridge
+  nebula-apps:
+    driver: bridge
+    name: nebula-apps

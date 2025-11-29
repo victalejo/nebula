@@ -1,0 +1,13 @@
+# Nebula Caddyfile
+# Managed by Nebula API - manual changes may be overwritten
+
+{
+    admin :2019
+    auto_https disable_redirects
+}
+
+# Health check endpoint
+:80 {
+    respond /health "OK" 200
+    respond "Nebula PaaS - No app configured for this domain" 404
+}

@@ -1,0 +1,61 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+nebula-server
+nebula
+
+# Build artifacts
+tmp/
+dist/
+*.out
+
+# Data
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+logs/
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+vendor/
+go.work
+
+# Node/Frontend
+web/node_modules/
+web/dist/
+web/.vite/
+*.tsbuildinfo
+
+# Test
+coverage/
+*.cover
+*.coverprofile
+
+# Temp
+*.tmp
+*.temp
+.cache/
+/.claude
