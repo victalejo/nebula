@@ -15,6 +15,12 @@ import (
 type Store struct {
 	db *sql.DB
 
+	// New repositories
+	projects *ProjectRepository
+	services *ServiceRepository
+	domains  *DomainRepository
+
+	// Legacy repositories
 	apps          *AppRepository
 	deployments   *DeploymentRepository
 	routes        *RouteRepository
@@ -45,6 +51,13 @@ func NewStore(dbPath string) (*Store, error) {
 	}
 
 	store := &Store{db: db}
+
+	// Initialize new repositories
+	store.projects = NewProjectRepository(db)
+	store.services = NewServiceRepository(db)
+	store.domains = NewDomainRepository(db)
+
+	// Initialize legacy repositories
 	store.apps = NewAppRepository(db)
 	store.deployments = NewDeploymentRepository(db)
 	store.routes = NewRouteRepository(db)
@@ -57,7 +70,22 @@ func NewStore(dbPath string) (*Store, error) {
 	return store, nil
 }
 
-// Apps returns the application repository
+// Projects returns the project repository
+func (s *Store) Projects() storage.ProjectRepository {
+	return s.projects
+}
+
+// Services returns the service repository
+func (s *Store) Services() storage.ServiceRepository {
+	return s.services
+}
+
+// Domains returns the domain repository
+func (s *Store) Domains() storage.DomainRepository {
+	return s.domains
+}
+
+// Apps returns the application repository (legacy, wraps ProjectRepository)
 func (s *Store) Apps() storage.AppRepository {
 	return s.apps
 }
@@ -118,6 +146,23 @@ func (s *Store) Migrate() error {
 	for _, col := range v2Columns {
 		// Ignore errors - column might already exist
 		s.db.Exec(col)
+	}
+
+	// Run V3 migration (new architecture: projects, services, domains)
+	if _, err := s.db.Exec(migrationV3); err != nil {
+		return fmt.Errorf("failed to run migration V3: %w", err)
+	}
+
+	// V3 schema changes - ignore errors if already applied
+	v3Alterations := []string{
+		// Add display_name and description to applications/projects
+		"ALTER TABLE applications ADD COLUMN display_name TEXT",
+		"ALTER TABLE applications ADD COLUMN description TEXT",
+		// Add service_id to deployments
+		"ALTER TABLE deployments ADD COLUMN service_id TEXT REFERENCES services(id)",
+	}
+	for _, alt := range v3Alterations {
+		s.db.Exec(alt)
 	}
 
 	return nil
@@ -215,4 +260,58 @@ CREATE TABLE IF NOT EXISTS binary_backups (
 );
 
 CREATE INDEX IF NOT EXISTS idx_binary_backups_version ON binary_backups(version);
+`
+
+const migrationV3 = `
+-- Services table: represents individual services within a project/application
+CREATE TABLE IF NOT EXISTS services (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'web',
+
+    -- Build configuration
+    builder TEXT DEFAULT 'nixpacks',
+    git_repo TEXT,
+    git_branch TEXT,
+    subdirectory TEXT DEFAULT '.',
+    docker_image TEXT,
+
+    -- Database configuration (only for type=database)
+    database_type TEXT,
+    database_version TEXT,
+
+    -- Runtime configuration
+    port INTEGER DEFAULT 8080,
+    command TEXT,
+    environment TEXT DEFAULT '{}',
+    replicas INTEGER DEFAULT 1,
+
+    -- State
+    status TEXT DEFAULT 'stopped',
+
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(project_id, name)
+);
+
+-- Domains table: replaces routes with more flexible routing
+CREATE TABLE IF NOT EXISTS domains (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+    service_id TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+    domain TEXT NOT NULL UNIQUE,
+    path_prefix TEXT DEFAULT '/',
+    active_slot TEXT DEFAULT 'blue',
+    ssl_enabled BOOLEAN DEFAULT TRUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for new tables
+CREATE INDEX IF NOT EXISTS idx_services_project_id ON services(project_id);
+CREATE INDEX IF NOT EXISTS idx_services_type ON services(type);
+CREATE INDEX IF NOT EXISTS idx_domains_project_id ON domains(project_id);
+CREATE INDEX IF NOT EXISTS idx_domains_service_id ON domains(service_id);
+CREATE INDEX IF NOT EXISTS idx_deployments_service_id ON deployments(service_id);
 `

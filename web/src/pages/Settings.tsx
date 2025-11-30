@@ -1,4 +1,4 @@
-import { Component, createSignal, onMount, Show, For } from 'solid-js';
+import { Component, createSignal, onMount } from 'solid-js';
 import api from '../api/client';
 import { updateStore } from '../stores/update';
 
@@ -13,8 +13,13 @@ const Settings: Component<SettingsProps> = (props) => {
   const [saving, setSaving] = createSignal(false);
   const [message, setMessage] = createSignal<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Update configuration state
+  const [updateMode, setUpdateMode] = createSignal<'auto' | 'notify' | 'disabled'>('notify');
+  const [checkInterval, setCheckInterval] = createSignal(1440);
+  const [savingUpdate, setSavingUpdate] = createSignal(false);
+
   onMount(async () => {
-    await loadTokenStatus();
+    await Promise.all([loadTokenStatus(), loadUpdateConfig()]);
   });
 
   const loadTokenStatus = async () => {
@@ -26,6 +31,35 @@ const Settings: Component<SettingsProps> = (props) => {
       setMessage({ type: 'error', text: 'Error al cargar configuración' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadUpdateConfig = async () => {
+    try {
+      await updateStore.fetchSystemInfo();
+      const info = updateStore.systemInfo();
+      if (info) {
+        setUpdateMode(info.update_mode);
+        setCheckInterval(info.check_interval);
+      }
+    } catch (err) {
+      console.error('Error loading update config:', err);
+    }
+  };
+
+  const handleSaveUpdateConfig = async (e: Event) => {
+    e.preventDefault();
+    try {
+      setSavingUpdate(true);
+      await updateStore.updateConfig({
+        mode: updateMode(),
+        check_interval: checkInterval(),
+      });
+      setMessage({ type: 'success', text: 'Configuración de actualizaciones guardada' });
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Error al guardar configuración de actualizaciones' });
+    } finally {
+      setSavingUpdate(false);
     }
   };
 
@@ -166,6 +200,57 @@ const Settings: Component<SettingsProps> = (props) => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Update Configuration Section */}
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Actualizaciones</h2>
+        <p class="text-sm text-gray-600 mb-4">
+          Configura cómo Nebula busca y aplica actualizaciones automáticas.
+        </p>
+
+        <form onSubmit={handleSaveUpdateConfig} class="space-y-4">
+          <div>
+            <label for="update-mode" class="block text-sm font-medium text-gray-700 mb-1">
+              Modo de actualización
+            </label>
+            <select
+              id="update-mode"
+              value={updateMode()}
+              onChange={(e) => setUpdateMode(e.currentTarget.value as 'auto' | 'notify' | 'disabled')}
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-nebula-500 focus:border-transparent"
+            >
+              <option value="auto">Automático - Descarga e instala automáticamente</option>
+              <option value="notify">Notificar - Avisa cuando hay actualizaciones</option>
+              <option value="disabled">Desactivado - No buscar actualizaciones</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="check-interval" class="block text-sm font-medium text-gray-700 mb-1">
+              Intervalo de verificación (minutos)
+            </label>
+            <input
+              id="check-interval"
+              type="number"
+              min="60"
+              value={checkInterval()}
+              onInput={(e) => setCheckInterval(parseInt(e.currentTarget.value) || 1440)}
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-nebula-500 focus:border-transparent"
+            />
+            <p class="text-xs text-gray-500 mt-1">
+              Mínimo 60 minutos. Por defecto: 1440 (24 horas)
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={savingUpdate()}
+            class="px-4 py-2 bg-nebula-500 text-white rounded-lg hover:bg-nebula-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {savingUpdate() ? 'Guardando...' : 'Guardar configuración'}
+          </button>
+        </form>
       </div>
     </div>
   );

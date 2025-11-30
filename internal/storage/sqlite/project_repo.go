@@ -8,49 +8,42 @@ import (
 	"github.com/victalejo/nebula/internal/core/storage"
 )
 
-// AppRepository is the SQLite implementation of AppRepository (legacy wrapper)
-type AppRepository struct {
+// ProjectRepository is the SQLite implementation of ProjectRepository
+type ProjectRepository struct {
 	db *sql.DB
 }
 
-// NewAppRepository creates a new app repository
-func NewAppRepository(db *sql.DB) *AppRepository {
-	return &AppRepository{db: db}
+// NewProjectRepository creates a new project repository
+func NewProjectRepository(db *sql.DB) *ProjectRepository {
+	return &ProjectRepository{db: db}
 }
 
-// Create creates a new application/project
-func (r *AppRepository) Create(ctx context.Context, app *storage.Project) error {
+// Create creates a new project
+func (r *ProjectRepository) Create(ctx context.Context, project *storage.Project) error {
 	query := `
 		INSERT INTO applications (id, name, display_name, description, deployment_mode, domain, git_repo, git_branch, environment, created_at, updated_at)
 		VALUES (?, ?, ?, ?, 'git', '', ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
-	app.CreatedAt = now
-	app.UpdatedAt = now
+	project.CreatedAt = now
+	project.UpdatedAt = now
 
 	_, err := r.db.ExecContext(ctx, query,
-		app.ID,
-		app.Name,
-		nullString(app.DisplayName),
-		nullString(app.Description),
-		nullString(app.GitRepo),
-		nullString(app.GitBranch),
-		app.Environment,
-		app.CreatedAt,
-		app.UpdatedAt,
+		project.ID,
+		project.Name,
+		nullString(project.DisplayName),
+		nullString(project.Description),
+		nullString(project.GitRepo),
+		nullString(project.GitBranch),
+		project.Environment,
+		project.CreatedAt,
+		project.UpdatedAt,
 	)
 	return err
 }
 
-func nullString(s string) sql.NullString {
-	if s == "" {
-		return sql.NullString{}
-	}
-	return sql.NullString{String: s, Valid: true}
-}
-
 // GetByID retrieves a project by ID
-func (r *AppRepository) GetByID(ctx context.Context, id string) (*storage.Project, error) {
+func (r *ProjectRepository) GetByID(ctx context.Context, id string) (*storage.Project, error) {
 	query := `
 		SELECT id, name, COALESCE(display_name, ''), COALESCE(description, ''),
 		       COALESCE(git_repo, ''), COALESCE(git_branch, ''), COALESCE(environment, '{}'),
@@ -80,7 +73,7 @@ func (r *AppRepository) GetByID(ctx context.Context, id string) (*storage.Projec
 }
 
 // GetByName retrieves a project by name
-func (r *AppRepository) GetByName(ctx context.Context, name string) (*storage.Project, error) {
+func (r *ProjectRepository) GetByName(ctx context.Context, name string) (*storage.Project, error) {
 	query := `
 		SELECT id, name, COALESCE(display_name, ''), COALESCE(description, ''),
 		       COALESCE(git_repo, ''), COALESCE(git_branch, ''), COALESCE(environment, '{}'),
@@ -110,35 +103,35 @@ func (r *AppRepository) GetByName(ctx context.Context, name string) (*storage.Pr
 }
 
 // Update updates a project
-func (r *AppRepository) Update(ctx context.Context, app *storage.Project) error {
+func (r *ProjectRepository) Update(ctx context.Context, project *storage.Project) error {
 	query := `
 		UPDATE applications
 		SET name = ?, display_name = ?, description = ?, git_repo = ?, git_branch = ?, environment = ?, updated_at = ?
 		WHERE id = ?
 	`
-	app.UpdatedAt = time.Now()
+	project.UpdatedAt = time.Now()
 	_, err := r.db.ExecContext(ctx, query,
-		app.Name,
-		nullString(app.DisplayName),
-		nullString(app.Description),
-		nullString(app.GitRepo),
-		nullString(app.GitBranch),
-		app.Environment,
-		app.UpdatedAt,
-		app.ID,
+		project.Name,
+		nullString(project.DisplayName),
+		nullString(project.Description),
+		nullString(project.GitRepo),
+		nullString(project.GitBranch),
+		project.Environment,
+		project.UpdatedAt,
+		project.ID,
 	)
 	return err
 }
 
 // Delete deletes a project
-func (r *AppRepository) Delete(ctx context.Context, id string) error {
+func (r *ProjectRepository) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM applications WHERE id = ?`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
 }
 
 // List returns all projects
-func (r *AppRepository) List(ctx context.Context) ([]*storage.Project, error) {
+func (r *ProjectRepository) List(ctx context.Context) ([]*storage.Project, error) {
 	query := `
 		SELECT id, name, COALESCE(display_name, ''), COALESCE(description, ''),
 		       COALESCE(git_repo, ''), COALESCE(git_branch, ''), COALESCE(environment, '{}'),
