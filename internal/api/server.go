@@ -150,18 +150,18 @@ func (s *Server) setupRoutes() {
 
 	// Service routes
 	serviceHandler := handler.NewServiceHandler(s.serviceService, s.log)
-	protected.GET("/projects/:projectId/services", serviceHandler.List)
-	protected.POST("/projects/:projectId/services", serviceHandler.Create)
-	protected.GET("/projects/:projectId/services/:serviceName", serviceHandler.Get)
-	protected.PUT("/projects/:projectId/services/:serviceName", serviceHandler.Update)
-	protected.DELETE("/projects/:projectId/services/:serviceName", serviceHandler.Delete)
+	protected.GET("/projects/:id/services", serviceHandler.List)
+	protected.POST("/projects/:id/services", serviceHandler.Create)
+	protected.GET("/projects/:id/services/:serviceName", serviceHandler.Get)
+	protected.PUT("/projects/:id/services/:serviceName", serviceHandler.Update)
+	protected.DELETE("/projects/:id/services/:serviceName", serviceHandler.Delete)
 	protected.GET("/services/:serviceId", serviceHandler.GetByID)
 
 	// Domain routes
 	domainHandler := handler.NewDomainHandler(s.domainService, s.log)
-	protected.GET("/projects/:projectId/domains", domainHandler.ListByProject)
-	protected.GET("/projects/:projectId/services/:serviceName/domains", domainHandler.ListByService)
-	protected.POST("/projects/:projectId/services/:serviceName/domains", domainHandler.Create)
+	protected.GET("/projects/:id/domains", domainHandler.ListByProject)
+	protected.GET("/projects/:id/services/:serviceName/domains", domainHandler.ListByService)
+	protected.POST("/projects/:id/services/:serviceName/domains", domainHandler.Create)
 	protected.GET("/domains/:domain", domainHandler.Get)
 	protected.PUT("/domains/:domain", domainHandler.Update)
 	protected.DELETE("/domains/:domain", domainHandler.Delete)

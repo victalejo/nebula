@@ -25,7 +25,7 @@ func NewDomainHandler(domainService *service.DomainService, log logger.Logger) *
 
 // ListByProject returns all domains for a project
 func (h *DomainHandler) ListByProject(c *gin.Context) {
-	projectID := c.Param("projectId")
+	projectID := c.Param("id")
 
 	domains, err := h.domainService.ListByProject(c.Request.Context(), projectID)
 	if err != nil {
@@ -40,7 +40,7 @@ func (h *DomainHandler) ListByProject(c *gin.Context) {
 
 // ListByService returns all domains for a service
 func (h *DomainHandler) ListByService(c *gin.Context) {
-	projectID := c.Param("projectId")
+	projectID := c.Param("id")
 	serviceName := c.Param("serviceName")
 
 	domains, err := h.domainService.ListByService(c.Request.Context(), projectID, serviceName)
@@ -56,7 +56,7 @@ func (h *DomainHandler) ListByService(c *gin.Context) {
 
 // Create creates a new domain for a service
 func (h *DomainHandler) Create(c *gin.Context) {
-	projectID := c.Param("projectId")
+	projectID := c.Param("id")
 	serviceName := c.Param("serviceName")
 
 	var req service.CreateDomainRequest

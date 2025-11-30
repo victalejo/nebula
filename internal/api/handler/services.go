@@ -25,7 +25,7 @@ func NewServiceHandler(serviceService *service.ServiceService, log logger.Logger
 
 // List returns all services for a project
 func (h *ServiceHandler) List(c *gin.Context) {
-	projectID := c.Param("projectId")
+	projectID := c.Param("id")
 
 	services, err := h.serviceService.List(c.Request.Context(), projectID)
 	if err != nil {
@@ -40,7 +40,7 @@ func (h *ServiceHandler) List(c *gin.Context) {
 
 // Create creates a new service within a project
 func (h *ServiceHandler) Create(c *gin.Context) {
-	projectID := c.Param("projectId")
+	projectID := c.Param("id")
 
 	var req service.CreateServiceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -63,7 +63,7 @@ func (h *ServiceHandler) Create(c *gin.Context) {
 
 // Get retrieves a service by project and name
 func (h *ServiceHandler) Get(c *gin.Context) {
-	projectID := c.Param("projectId")
+	projectID := c.Param("id")
 	serviceName := c.Param("serviceName")
 
 	svc, err := h.serviceService.Get(c.Request.Context(), projectID, serviceName)
@@ -94,7 +94,7 @@ func (h *ServiceHandler) GetByID(c *gin.Context) {
 
 // Update updates a service
 func (h *ServiceHandler) Update(c *gin.Context) {
-	projectID := c.Param("projectId")
+	projectID := c.Param("id")
 	serviceName := c.Param("serviceName")
 
 	var req service.UpdateServiceRequest
@@ -118,7 +118,7 @@ func (h *ServiceHandler) Update(c *gin.Context) {
 
 // Delete deletes a service
 func (h *ServiceHandler) Delete(c *gin.Context) {
-	projectID := c.Param("projectId")
+	projectID := c.Param("id")
 	serviceName := c.Param("serviceName")
 
 	if err := h.serviceService.Delete(c.Request.Context(), projectID, serviceName); err != nil {
