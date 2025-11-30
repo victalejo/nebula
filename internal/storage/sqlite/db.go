@@ -165,6 +165,9 @@ func (s *Store) Migrate() error {
 		s.db.Exec(alt)
 	}
 
+	// Create index on service_id after column is added
+	s.db.Exec("CREATE INDEX IF NOT EXISTS idx_deployments_service_id ON deployments(service_id)")
+
 	return nil
 }
 
@@ -313,5 +316,4 @@ CREATE INDEX IF NOT EXISTS idx_services_project_id ON services(project_id);
 CREATE INDEX IF NOT EXISTS idx_services_type ON services(type);
 CREATE INDEX IF NOT EXISTS idx_domains_project_id ON domains(project_id);
 CREATE INDEX IF NOT EXISTS idx_domains_service_id ON domains(service_id);
-CREATE INDEX IF NOT EXISTS idx_deployments_service_id ON deployments(service_id);
 `

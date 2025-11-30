@@ -178,26 +178,178 @@ class ApiClient {
   async deleteGitHubToken(): Promise<{ message: string }> {
     return this.delete<{ message: string }>('/settings/github-token');
   }
+
+  // Services
+  async listServices(projectId: string): Promise<Service[]> {
+    const result = await this.get<ApiResponse<Service[]>>(`/projects/${projectId}/services`);
+    return result.data;
+  }
+
+  async getService(projectId: string, serviceName: string): Promise<Service> {
+    const result = await this.get<ApiResponse<Service>>(`/projects/${projectId}/services/${serviceName}`);
+    return result.data;
+  }
+
+  async getServiceById(serviceId: string): Promise<Service> {
+    const result = await this.get<ApiResponse<Service>>(`/services/${serviceId}`);
+    return result.data;
+  }
+
+  async createService(projectId: string, data: CreateServiceRequest): Promise<Service> {
+    const result = await this.post<ApiResponse<Service>>(`/projects/${projectId}/services`, data);
+    return result.data;
+  }
+
+  async updateService(projectId: string, serviceName: string, data: UpdateServiceRequest): Promise<Service> {
+    const result = await this.put<ApiResponse<Service>>(`/projects/${projectId}/services/${serviceName}`, data);
+    return result.data;
+  }
+
+  async deleteService(projectId: string, serviceName: string): Promise<void> {
+    await this.delete(`/projects/${projectId}/services/${serviceName}`);
+  }
+
+  // Domains
+  async listProjectDomains(projectId: string): Promise<Domain[]> {
+    const result = await this.get<ApiResponse<Domain[]>>(`/projects/${projectId}/domains`);
+    return result.data;
+  }
+
+  async listServiceDomains(projectId: string, serviceName: string): Promise<Domain[]> {
+    const result = await this.get<ApiResponse<Domain[]>>(`/projects/${projectId}/services/${serviceName}/domains`);
+    return result.data;
+  }
+
+  async getDomain(domainName: string): Promise<Domain> {
+    const result = await this.get<ApiResponse<Domain>>(`/domains/${domainName}`);
+    return result.data;
+  }
+
+  async createDomain(projectId: string, serviceName: string, data: CreateDomainRequest): Promise<Domain> {
+    const result = await this.post<ApiResponse<Domain>>(`/projects/${projectId}/services/${serviceName}/domains`, data);
+    return result.data;
+  }
+
+  async updateDomain(domainName: string, data: UpdateDomainRequest): Promise<Domain> {
+    const result = await this.put<ApiResponse<Domain>>(`/domains/${domainName}`, data);
+    return result.data;
+  }
+
+  async deleteDomain(domainName: string): Promise<void> {
+    await this.delete(`/domains/${domainName}`);
+  }
 }
 
 // Types
+
+// Legacy App type (maps to Project + main service)
 export interface App {
   id: string;
   name: string;
+  display_name?: string;
+  description?: string;
   deployment_mode: 'git' | 'docker_image' | 'docker_compose';
   domain: string;
   git_repo?: string;
   git_branch?: string;
   docker_image?: string;
   compose_file?: string;
-  env_vars: Record<string, string>;
+  environment: Record<string, string>;
   created_at: string;
   updated_at: string;
+}
+
+// New Project type
+export interface Project {
+  id: string;
+  name: string;
+  display_name?: string;
+  description?: string;
+  git_repo?: string;
+  git_branch?: string;
+  environment: Record<string, string>;
+  created_at: string;
+  updated_at: string;
+}
+
+// Service types
+export type ServiceType = 'web' | 'worker' | 'cron' | 'database';
+export type BuilderType = 'nixpacks' | 'railpacks' | 'dockerfile' | 'docker_image' | 'buildpacks';
+
+export interface Service {
+  id: string;
+  project_id: string;
+  name: string;
+  type: ServiceType;
+  builder: BuilderType;
+  git_repo?: string;
+  git_branch?: string;
+  subdirectory?: string;
+  docker_image?: string;
+  database_type?: string;
+  database_version?: string;
+  port: number;
+  command?: string;
+  environment: Record<string, string>;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateServiceRequest {
+  name: string;
+  type?: ServiceType;
+  builder?: BuilderType;
+  git_repo?: string;
+  git_branch?: string;
+  subdirectory?: string;
+  docker_image?: string;
+  database_type?: string;
+  database_version?: string;
+  port?: number;
+  command?: string;
+  environment?: Record<string, string>;
+}
+
+export interface UpdateServiceRequest {
+  builder?: BuilderType;
+  git_repo?: string;
+  git_branch?: string;
+  subdirectory?: string;
+  docker_image?: string;
+  database_version?: string;
+  port?: number;
+  command?: string;
+  environment?: Record<string, string>;
+}
+
+// Domain types
+export interface Domain {
+  id: string;
+  project_id: string;
+  service_id: string;
+  domain: string;
+  path_prefix: string;
+  active_slot: 'blue' | 'green';
+  ssl_enabled: boolean;
+  created_at: string;
+}
+
+export interface CreateDomainRequest {
+  domain: string;
+  path_prefix?: string;
+  ssl_enabled?: boolean;
+}
+
+export interface UpdateDomainRequest {
+  path_prefix?: string;
+  ssl_enabled?: boolean;
 }
 
 export interface Deployment {
   id: string;
   app_id: string;
+  service_id?: string;
   version: string;
   slot: 'blue' | 'green';
   status: 'pending' | 'preparing' | 'deploying' | 'running' | 'stopped' | 'failed';
@@ -208,13 +360,15 @@ export interface Deployment {
 
 export interface CreateAppRequest {
   name: string;
-  deployment_mode: 'git' | 'docker_image' | 'docker_compose';
+  display_name?: string;
+  description?: string;
+  deployment_mode?: 'git' | 'docker_image' | 'docker_compose';
   domain?: string;
   git_repo?: string;
   git_branch?: string;
   docker_image?: string;
   compose_file?: string;
-  env_vars?: Record<string, string>;
+  environment?: Record<string, string>;
 }
 
 export interface DeployImageRequest {

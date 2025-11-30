@@ -29,20 +29,24 @@ type ServerConfig struct {
 
 // Server represents the API server
 type Server struct {
-	config        ServerConfig
-	router        *gin.Engine
-	httpServer    *http.Server
-	appService    *service.AppService
-	deployService *service.DeployService
-	updateService *service.UpdateService
-	settingsStore storage.SettingsRepository
-	log           logger.Logger
+	config         ServerConfig
+	router         *gin.Engine
+	httpServer     *http.Server
+	appService     *service.AppService
+	serviceService *service.ServiceService
+	domainService  *service.DomainService
+	deployService  *service.DeployService
+	updateService  *service.UpdateService
+	settingsStore  storage.SettingsRepository
+	log            logger.Logger
 }
 
 // NewServer creates a new API server
 func NewServer(
 	config ServerConfig,
 	appService *service.AppService,
+	serviceService *service.ServiceService,
+	domainService *service.DomainService,
 	deployService *service.DeployService,
 	updateService *service.UpdateService,
 	settingsStore storage.SettingsRepository,
@@ -54,13 +58,15 @@ func NewServer(
 	router := gin.New()
 
 	server := &Server{
-		config:        config,
-		router:        router,
-		appService:    appService,
-		deployService: deployService,
-		updateService: updateService,
-		settingsStore: settingsStore,
-		log:           log,
+		config:         config,
+		router:         router,
+		appService:     appService,
+		serviceService: serviceService,
+		domainService:  domainService,
+		deployService:  deployService,
+		updateService:  updateService,
+		settingsStore:  settingsStore,
+		log:            log,
 	}
 
 	server.setupMiddleware()
@@ -127,13 +133,38 @@ func (s *Server) setupRoutes() {
 	// Auth routes (protected)
 	protected.GET("/auth/me", authHandler.Me)
 
-	// App routes
+	// App/Project routes (legacy compatibility - apps endpoint maps to projects)
 	appHandler := handler.NewAppHandler(s.appService, s.log)
 	protected.GET("/apps", appHandler.List)
 	protected.POST("/apps", appHandler.Create)
 	protected.GET("/apps/:id", appHandler.Get)
 	protected.PUT("/apps/:id", appHandler.Update)
 	protected.DELETE("/apps/:id", appHandler.Delete)
+
+	// Project routes (new canonical endpoint)
+	protected.GET("/projects", appHandler.List)
+	protected.POST("/projects", appHandler.Create)
+	protected.GET("/projects/:id", appHandler.Get)
+	protected.PUT("/projects/:id", appHandler.Update)
+	protected.DELETE("/projects/:id", appHandler.Delete)
+
+	// Service routes
+	serviceHandler := handler.NewServiceHandler(s.serviceService, s.log)
+	protected.GET("/projects/:projectId/services", serviceHandler.List)
+	protected.POST("/projects/:projectId/services", serviceHandler.Create)
+	protected.GET("/projects/:projectId/services/:serviceName", serviceHandler.Get)
+	protected.PUT("/projects/:projectId/services/:serviceName", serviceHandler.Update)
+	protected.DELETE("/projects/:projectId/services/:serviceName", serviceHandler.Delete)
+	protected.GET("/services/:serviceId", serviceHandler.GetByID)
+
+	// Domain routes
+	domainHandler := handler.NewDomainHandler(s.domainService, s.log)
+	protected.GET("/projects/:projectId/domains", domainHandler.ListByProject)
+	protected.GET("/projects/:projectId/services/:serviceName/domains", domainHandler.ListByService)
+	protected.POST("/projects/:projectId/services/:serviceName/domains", domainHandler.Create)
+	protected.GET("/domains/:domain", domainHandler.Get)
+	protected.PUT("/domains/:domain", domainHandler.Update)
+	protected.DELETE("/domains/:domain", domainHandler.Delete)
 
 	// Deployment routes
 	deployHandler := handler.NewDeployHandler(s.deployService, s.log)

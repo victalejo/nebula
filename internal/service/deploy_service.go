@@ -64,6 +64,7 @@ type RegistryAuthReq struct {
 type DeploymentResponse struct {
 	ID        string `json:"id"`
 	AppID     string `json:"app_id"`
+	ServiceID string `json:"service_id,omitempty"`
 	Version   string `json:"version"`
 	Slot      string `json:"slot"`
 	Status    string `json:"status"`
@@ -77,24 +78,25 @@ func (s *DeployService) DeployImage(ctx context.Context, appID string, req Deplo
 		"image", req.Image,
 	)
 
-	// Get the application - try by ID first, then by name
-	app, err := s.store.Apps().GetByID(ctx, appID)
+	// Get the project - try by ID first, then by name
+	project, err := s.store.Apps().GetByID(ctx, appID)
 	if err != nil {
-		return nil, apperrors.NewInternalError("failed to get application", err)
+		return nil, apperrors.NewInternalError("failed to get project", err)
 	}
-	if app == nil {
-		app, err = s.store.Apps().GetByName(ctx, appID)
+	if project == nil {
+		project, err = s.store.Apps().GetByName(ctx, appID)
 		if err != nil {
-			return nil, apperrors.NewInternalError("failed to get application", err)
+			return nil, apperrors.NewInternalError("failed to get project", err)
 		}
 	}
-	if app == nil {
-		return nil, apperrors.NewNotFoundError("application", appID)
+	if project == nil {
+		return nil, apperrors.NewNotFoundError("project", appID)
 	}
 
-	// Validate deployment mode
-	if app.DeploymentMode != string(deployer.ModeImage) {
-		return nil, apperrors.NewValidationError("application is not configured for image deployment", nil)
+	// Get main service and check if it's configured for image deployment
+	mainService, _ := s.store.Services().GetByProjectIDAndName(ctx, project.ID, "main")
+	if mainService != nil && mainService.Builder != storage.BuilderDockerImage {
+		return nil, apperrors.NewValidationError("service is not configured for image deployment", nil)
 	}
 
 	// Get the image deployer
@@ -104,7 +106,7 @@ func (s *DeployService) DeployImage(ctx context.Context, appID string, req Deplo
 	}
 
 	// Determine target slot (opposite of current active)
-	targetSlot := s.getTargetSlot(ctx, app.ID)
+	targetSlot := s.getTargetSlot(ctx, project.ID)
 
 	// Build source config
 	sourceConfig := deployer.SourceConfig{
@@ -123,8 +125,8 @@ func (s *DeployService) DeployImage(ctx context.Context, appID string, req Deplo
 
 	// Merge environment variables
 	env := make(map[string]string)
-	if app.Environment != "" {
-		json.Unmarshal([]byte(app.Environment), &env)
+	if project.Environment != "" {
+		json.Unmarshal([]byte(project.Environment), &env)
 	}
 	for k, v := range req.Environment {
 		env[k] = v
@@ -132,7 +134,7 @@ func (s *DeployService) DeployImage(ctx context.Context, appID string, req Deplo
 
 	// Create deployment spec
 	spec := &deployer.DeploymentSpec{
-		AppID:       app.ID,
+		AppID:       project.ID,
 		Source:      sourceConfig,
 		Environment: env,
 		TargetSlot:  targetSlot,
@@ -149,9 +151,15 @@ func (s *DeployService) DeployImage(ctx context.Context, appID string, req Deplo
 	sourceJSON, _ := json.Marshal(sourceConfig)
 	envJSON, _ := json.Marshal(env)
 
+	serviceID := ""
+	if mainService != nil {
+		serviceID = mainService.ID
+	}
+
 	deployment := &storage.Deployment{
 		ID:           uuid.New().String(),
-		AppID:        app.ID,
+		AppID:        project.ID,
+		ServiceID:    serviceID,
 		Version:      fmt.Sprintf("v%d", time.Now().Unix()),
 		Slot:         string(targetSlot),
 		Status:       string(deployer.StatusPending),
@@ -164,11 +172,12 @@ func (s *DeployService) DeployImage(ctx context.Context, appID string, req Deplo
 	}
 
 	// Execute deployment asynchronously
-	go s.executeDeployment(context.Background(), app, deployment, imageDeployer, spec)
+	go s.executeDeployment(context.Background(), project, deployment, imageDeployer, spec)
 
 	return &DeploymentResponse{
 		ID:        deployment.ID,
 		AppID:     deployment.AppID,
+		ServiceID: deployment.ServiceID,
 		Version:   deployment.Version,
 		Slot:      deployment.Slot,
 		Status:    deployment.Status,
@@ -180,29 +189,42 @@ func (s *DeployService) DeployImage(ctx context.Context, appID string, req Deplo
 func (s *DeployService) DeployGit(ctx context.Context, appID string, req DeployGitRequest) (*DeploymentResponse, error) {
 	s.log.Info("starting git deployment", "app_id", appID)
 
-	// Get the application - try by ID first, then by name
-	app, err := s.store.Apps().GetByID(ctx, appID)
+	// Get the project - try by ID first, then by name
+	project, err := s.store.Apps().GetByID(ctx, appID)
 	if err != nil {
-		return nil, apperrors.NewInternalError("failed to get application", err)
+		return nil, apperrors.NewInternalError("failed to get project", err)
 	}
-	if app == nil {
-		app, err = s.store.Apps().GetByName(ctx, appID)
+	if project == nil {
+		project, err = s.store.Apps().GetByName(ctx, appID)
 		if err != nil {
-			return nil, apperrors.NewInternalError("failed to get application", err)
+			return nil, apperrors.NewInternalError("failed to get project", err)
 		}
 	}
-	if app == nil {
-		return nil, apperrors.NewNotFoundError("application", appID)
+	if project == nil {
+		return nil, apperrors.NewNotFoundError("project", appID)
 	}
 
-	// Validate deployment mode
-	if app.DeploymentMode != string(deployer.ModeGit) {
-		return nil, apperrors.NewValidationError("application is not configured for git deployment", nil)
+	// Get main service and check builder
+	mainService, _ := s.store.Services().GetByProjectIDAndName(ctx, project.ID, "main")
+	if mainService != nil && mainService.Builder == storage.BuilderDockerImage {
+		return nil, apperrors.NewValidationError("service is not configured for git deployment", nil)
+	}
+
+	// Determine git repo - from service, then project
+	gitRepo := project.GitRepo
+	gitBranch := project.GitBranch
+	if mainService != nil {
+		if mainService.GitRepo != "" {
+			gitRepo = mainService.GitRepo
+		}
+		if mainService.GitBranch != "" {
+			gitBranch = mainService.GitBranch
+		}
 	}
 
 	// Validate git repo is configured
-	if app.GitRepo == "" {
-		return nil, apperrors.NewValidationError("git repository URL is not configured for this application", nil)
+	if gitRepo == "" {
+		return nil, apperrors.NewValidationError("git repository URL is not configured", nil)
 	}
 
 	// Get the git deployer
@@ -212,12 +234,12 @@ func (s *DeployService) DeployGit(ctx context.Context, appID string, req DeployG
 	}
 
 	// Determine target slot
-	targetSlot := s.getTargetSlot(ctx, app.ID)
+	targetSlot := s.getTargetSlot(ctx, project.ID)
 
 	// Determine branch
 	branch := req.Branch
 	if branch == "" {
-		branch = app.GitBranch
+		branch = gitBranch
 	}
 	if branch == "" {
 		branch = "main"
@@ -225,8 +247,8 @@ func (s *DeployService) DeployGit(ctx context.Context, appID string, req DeployG
 
 	// Merge environment variables
 	env := make(map[string]string)
-	if app.Environment != "" {
-		json.Unmarshal([]byte(app.Environment), &env)
+	if project.Environment != "" {
+		json.Unmarshal([]byte(project.Environment), &env)
 	}
 	for k, v := range req.Environment {
 		env[k] = v
@@ -234,9 +256,9 @@ func (s *DeployService) DeployGit(ctx context.Context, appID string, req DeployG
 
 	// Create deployment spec
 	spec := &deployer.DeploymentSpec{
-		AppID:       app.ID,
-		AppName:     app.Name,
-		GitRepo:     app.GitRepo,
+		AppID:       project.ID,
+		AppName:     project.Name,
+		GitRepo:     gitRepo,
 		GitBranch:   branch,
 		Environment: env,
 		TargetSlot:  targetSlot,
@@ -251,14 +273,20 @@ func (s *DeployService) DeployGit(ctx context.Context, appID string, req DeployG
 
 	// Create deployment record
 	sourceJSON, _ := json.Marshal(map[string]string{
-		"git_repo":   app.GitRepo,
+		"git_repo":   gitRepo,
 		"git_branch": branch,
 	})
 	envJSON, _ := json.Marshal(env)
 
+	serviceID := ""
+	if mainService != nil {
+		serviceID = mainService.ID
+	}
+
 	deployment := &storage.Deployment{
 		ID:           uuid.New().String(),
-		AppID:        app.ID,
+		AppID:        project.ID,
+		ServiceID:    serviceID,
 		Version:      fmt.Sprintf("v%d", time.Now().Unix()),
 		Slot:         string(targetSlot),
 		Status:       string(deployer.StatusPending),
@@ -271,11 +299,12 @@ func (s *DeployService) DeployGit(ctx context.Context, appID string, req DeployG
 	}
 
 	// Execute deployment asynchronously
-	go s.executeDeployment(context.Background(), app, deployment, gitDeployer, spec)
+	go s.executeDeployment(context.Background(), project, deployment, gitDeployer, spec)
 
 	return &DeploymentResponse{
 		ID:        deployment.ID,
 		AppID:     deployment.AppID,
+		ServiceID: deployment.ServiceID,
 		Version:   deployment.Version,
 		Slot:      deployment.Slot,
 		Status:    deployment.Status,
@@ -286,14 +315,14 @@ func (s *DeployService) DeployGit(ctx context.Context, appID string, req DeployG
 // executeDeployment runs the deployment process
 func (s *DeployService) executeDeployment(
 	ctx context.Context,
-	app *storage.Application,
+	project *storage.Project,
 	deployment *storage.Deployment,
 	dep deployer.Deployer,
 	spec *deployer.DeploymentSpec,
 ) {
 	s.log.Info("executing deployment",
 		"deployment_id", deployment.ID,
-		"app_id", app.ID,
+		"app_id", project.ID,
 	)
 
 	// Update status to preparing
@@ -331,7 +360,7 @@ func (s *DeployService) executeDeployment(
 			ID:           uuid.New().String(),
 			DeploymentID: deployment.ID,
 			ContainerID:  containerID,
-			Name:         fmt.Sprintf("%s-%s", app.Name, spec.TargetSlot),
+			Name:         fmt.Sprintf("%s-%s", project.Name, spec.TargetSlot),
 			Status:       "running",
 			Port:         port,
 		}
@@ -353,26 +382,29 @@ func (s *DeployService) executeDeployment(
 	}
 
 	// Update route to point to new slot
-	if app.Domain != "" {
+	// Check if project has domains configured
+	domains, _ := s.store.Domains().ListByProjectID(ctx, project.ID)
+	if len(domains) > 0 {
 		mainPort := 0
 		if p, ok := result.Ports["main"]; ok {
 			mainPort = p
 		}
 
-		route := proxy.Route{
-			Domain: app.Domain,
-			AppID:  app.ID,
-			BlueTarget: &proxy.Upstream{
-				Host: "localhost",
-				Port: mainPort,
-			},
-			ActiveSlot: proxy.Slot(spec.TargetSlot),
-			SSLEnabled: true,
-		}
+		for _, domain := range domains {
+			route := proxy.Route{
+				Domain: domain.Domain,
+				AppID:  project.ID,
+				BlueTarget: &proxy.Upstream{
+					Host: "localhost",
+					Port: mainPort,
+				},
+				ActiveSlot: proxy.Slot(spec.TargetSlot),
+				SSLEnabled: domain.SSLEnabled,
+			}
 
-		if err := s.proxyManager.AddRoute(ctx, route); err != nil {
-			s.log.Error("failed to update route", "error", err)
-			// Don't fail deployment for route errors
+			if err := s.proxyManager.AddRoute(ctx, route); err != nil {
+				s.log.Error("failed to update route", "error", err, "domain", domain.Domain)
+			}
 		}
 	}
 
@@ -382,18 +414,24 @@ func (s *DeployService) executeDeployment(
 	deployment.FinishedAt = &finishedAt
 	s.store.Deployments().Update(ctx, deployment)
 
-	// Update route's active slot
-	if route, _ := s.store.Routes().GetByAppID(ctx, app.ID); route != nil {
+	// Update route's active slot (legacy)
+	if route, _ := s.store.Routes().GetByAppID(ctx, project.ID); route != nil {
 		route.ActiveSlot = string(spec.TargetSlot)
 		s.store.Routes().Update(ctx, route)
 	}
 
+	// Update domains' active slot
+	for _, domain := range domains {
+		domain.ActiveSlot = string(spec.TargetSlot)
+		s.store.Domains().Update(ctx, domain)
+	}
+
 	// Stop old deployment (if exists)
-	s.stopOldDeployment(ctx, app.ID, string(spec.TargetSlot.Opposite()), dep)
+	s.stopOldDeployment(ctx, project.ID, string(spec.TargetSlot.Opposite()), dep)
 
 	s.log.Info("deployment completed successfully",
 		"deployment_id", deployment.ID,
-		"app_id", app.ID,
+		"app_id", project.ID,
 	)
 }
 
@@ -463,6 +501,7 @@ func (s *DeployService) GetDeployment(ctx context.Context, id string) (*Deployme
 	return &DeploymentResponse{
 		ID:        deployment.ID,
 		AppID:     deployment.AppID,
+		ServiceID: deployment.ServiceID,
 		Version:   deployment.Version,
 		Slot:      deployment.Slot,
 		Status:    deployment.Status,
@@ -473,21 +512,21 @@ func (s *DeployService) GetDeployment(ctx context.Context, id string) (*Deployme
 // ListDeployments returns all deployments for an application
 func (s *DeployService) ListDeployments(ctx context.Context, appIDOrName string) ([]*DeploymentResponse, error) {
 	// Resolve app ID from name if needed
-	app, err := s.store.Apps().GetByID(ctx, appIDOrName)
+	project, err := s.store.Apps().GetByID(ctx, appIDOrName)
 	if err != nil {
-		return nil, apperrors.NewInternalError("failed to get application", err)
+		return nil, apperrors.NewInternalError("failed to get project", err)
 	}
-	if app == nil {
-		app, err = s.store.Apps().GetByName(ctx, appIDOrName)
+	if project == nil {
+		project, err = s.store.Apps().GetByName(ctx, appIDOrName)
 		if err != nil {
-			return nil, apperrors.NewInternalError("failed to get application", err)
+			return nil, apperrors.NewInternalError("failed to get project", err)
 		}
 	}
-	if app == nil {
-		return nil, apperrors.NewNotFoundError("application", appIDOrName)
+	if project == nil {
+		return nil, apperrors.NewNotFoundError("project", appIDOrName)
 	}
 
-	deployments, err := s.store.Deployments().ListByAppID(ctx, app.ID)
+	deployments, err := s.store.Deployments().ListByAppID(ctx, project.ID)
 	if err != nil {
 		return nil, apperrors.NewInternalError("failed to list deployments", err)
 	}
@@ -497,6 +536,7 @@ func (s *DeployService) ListDeployments(ctx context.Context, appIDOrName string)
 		responses[i] = &DeploymentResponse{
 			ID:        d.ID,
 			AppID:     d.AppID,
+			ServiceID: d.ServiceID,
 			Version:   d.Version,
 			Slot:      d.Slot,
 			Status:    d.Status,

@@ -87,6 +87,8 @@ func main() {
 
 	// Initialize services
 	appService := service.NewAppService(store, log)
+	serviceService := service.NewServiceService(store, log)
+	domainService := service.NewDomainService(store, log)
 	deployService := service.NewDeployService(store, registry, proxyManager, log)
 	updateService := service.NewUpdateService(cfg.Update, store, log)
 
@@ -98,7 +100,7 @@ func main() {
 		TokenDuration: time.Duration(cfg.Auth.TokenDuration) * time.Hour,
 		AdminUsername: cfg.Auth.AdminUsername,
 		AdminPassword: cfg.Auth.AdminPassword,
-	}, appService, deployService, updateService, store.Settings(), log)
+	}, appService, serviceService, domainService, deployService, updateService, store.Settings(), log)
 
 	// Start background update checker
 	go updateService.StartBackgroundChecker(context.Background())
