@@ -12,7 +12,7 @@ const DeployModal: Component<DeployModalProps> = (props) => {
   const [tag, setTag] = createSignal('latest');
   const [port, setPort] = createSignal(80);
   const [envVars, setEnvVars] = createSignal<Array<{ key: string; value: string }>>(
-    Object.entries(props.app.env_vars || {}).map(([key, value]) => ({ key, value }))
+    Object.entries(props.app.environment || {}).map(([key, value]) => ({ key, value: String(value) }))
   );
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);

@@ -17,6 +17,7 @@ const Settings: Component<SettingsProps> = (props) => {
   const [updateMode, setUpdateMode] = createSignal<'auto' | 'notify' | 'disabled'>('notify');
   const [checkInterval, setCheckInterval] = createSignal(1440);
   const [savingUpdate, setSavingUpdate] = createSignal(false);
+  const [checking, setChecking] = createSignal(false);
 
   onMount(async () => {
     await Promise.all([loadTokenStatus(), loadUpdateConfig()]);
@@ -60,6 +61,23 @@ const Settings: Component<SettingsProps> = (props) => {
       setMessage({ type: 'error', text: 'Error al guardar configuración de actualizaciones' });
     } finally {
       setSavingUpdate(false);
+    }
+  };
+
+  const handleCheckNow = async () => {
+    try {
+      setChecking(true);
+      await updateStore.checkForUpdates();
+      const info = updateStore.updateInfo();
+      if (info?.available) {
+        setMessage({ type: 'success', text: `Nueva versión disponible: ${info.latest_version}` });
+      } else {
+        setMessage({ type: 'success', text: 'Ya tienes la última versión' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Error al comprobar actualizaciones' });
+    } finally {
+      setChecking(false);
     }
   };
 
@@ -208,6 +226,29 @@ const Settings: Component<SettingsProps> = (props) => {
         <p class="text-sm text-gray-600 mb-4">
           Configura cómo Nebula busca y aplica actualizaciones automáticas.
         </p>
+
+        {/* Current Version Info */}
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg mb-6">
+          <div>
+            <span class="text-sm font-medium text-gray-700">Versión actual: </span>
+            <span class="text-sm font-mono text-nebula-600">{updateStore.systemInfo()?.version || 'Cargando...'}</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleCheckNow}
+            disabled={checking()}
+            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+          >
+            {checking() ? (
+              <>
+                <div class="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
+                <span>Comprobando...</span>
+              </>
+            ) : (
+              <span>Comprobar ahora</span>
+            )}
+          </button>
+        </div>
 
         <form onSubmit={handleSaveUpdateConfig} class="space-y-4">
           <div>

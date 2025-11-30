@@ -201,16 +201,16 @@ const AppDetail: Component<AppDetailProps> = (props) => {
               <div class="card lg:col-span-2">
                 <h3 class="font-semibold text-gray-900 mb-4">Variables de Entorno</h3>
                 <Show
-                  when={Object.keys(app()!.env_vars || {}).length > 0}
+                  when={Object.keys(app()!.environment || {}).length > 0}
                   fallback={<p class="text-gray-500">Sin variables de entorno</p>}
                 >
                   <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm">
-                    <For each={Object.entries(app()!.env_vars || {})}>
+                    <For each={Object.entries(app()!.environment || {})}>
                       {([key, value]) => (
                         <div class="flex">
                           <span class="text-nebula-600">{key}</span>
                           <span class="text-gray-400">=</span>
-                          <span class="text-gray-700">{value}</span>
+                          <span class="text-gray-700">{String(value)}</span>
                         </div>
                       )}
                     </For>
