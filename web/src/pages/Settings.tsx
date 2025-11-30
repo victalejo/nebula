@@ -1,4 +1,5 @@
 import { Component, createSignal, onMount } from 'solid-js';
+import { marked } from 'marked';
 import api from '../api/client';
 import { updateStore } from '../stores/update';
 
@@ -18,6 +19,7 @@ const Settings: Component<SettingsProps> = (props) => {
   const [checkInterval, setCheckInterval] = createSignal(1440);
   const [savingUpdate, setSavingUpdate] = createSignal(false);
   const [checking, setChecking] = createSignal(false);
+  const [applying, setApplying] = createSignal(false);
 
   onMount(async () => {
     await Promise.all([loadTokenStatus(), loadUpdateConfig()]);
@@ -79,6 +81,25 @@ const Settings: Component<SettingsProps> = (props) => {
     } finally {
       setChecking(false);
     }
+  };
+
+  const handleApplyUpdate = async () => {
+    if (!confirm('¿Estás seguro de que deseas actualizar? El servidor se reiniciará.')) {
+      return;
+    }
+    try {
+      setApplying(true);
+      setMessage({ type: 'success', text: 'Descargando e instalando actualización...' });
+      await updateStore.applyUpdate();
+      setMessage({ type: 'success', text: 'Actualización aplicada. El servidor se reiniciará en breve...' });
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Error al aplicar la actualización' });
+      setApplying(false);
+    }
+  };
+
+  const renderMarkdown = (md: string): string => {
+    return marked.parse(md, { async: false }) as string;
   };
 
   const handleSaveToken = async (e: Event) => {
@@ -272,9 +293,27 @@ const Settings: Component<SettingsProps> = (props) => {
                   {updateStore.updateInfo()?.release_notes && (
                     <div class="mt-3 p-3 bg-white rounded border border-gray-200">
                       <h4 class="text-xs font-medium text-gray-700 mb-2">Notas de la versión:</h4>
-                      <div class="text-xs text-gray-600 whitespace-pre-wrap">{updateStore.updateInfo()?.release_notes}</div>
+                      <div
+                        class="text-sm text-gray-600 prose prose-sm max-w-none"
+                        innerHTML={renderMarkdown(updateStore.updateInfo()?.release_notes || '')}
+                      />
                     </div>
                   )}
+                  <button
+                    type="button"
+                    onClick={handleApplyUpdate}
+                    disabled={applying()}
+                    class="mt-4 w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {applying() ? (
+                      <>
+                        <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Aplicando actualización...</span>
+                      </>
+                    ) : (
+                      <span>Actualizar a {updateStore.updateInfo()?.latest_version}</span>
+                    )}
+                  </button>
                 </div>
               ) : (
                 <p class="text-sm text-gray-500">Ya tienes la última versión</p>
