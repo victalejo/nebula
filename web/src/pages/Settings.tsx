@@ -228,26 +228,59 @@ const Settings: Component<SettingsProps> = (props) => {
         </p>
 
         {/* Current Version Info */}
-        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg mb-6">
-          <div>
-            <span class="text-sm font-medium text-gray-700">Versión actual: </span>
-            <span class="text-sm font-mono text-nebula-600">{updateStore.systemInfo()?.version || 'Cargando...'}</span>
+        <div class="p-4 bg-gray-50 rounded-lg mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <span class="text-sm font-medium text-gray-700">Versión actual: </span>
+              <span class="text-sm font-mono text-nebula-600">{updateStore.systemInfo()?.version || 'Cargando...'}</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleCheckNow}
+              disabled={checking()}
+              class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            >
+              {checking() ? (
+                <>
+                  <div class="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Comprobando...</span>
+                </>
+              ) : (
+                <span>Comprobar ahora</span>
+              )}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleCheckNow}
-            disabled={checking()}
-            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-          >
-            {checking() ? (
-              <>
-                <div class="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
-                <span>Comprobando...</span>
-              </>
-            ) : (
-              <span>Comprobar ahora</span>
-            )}
-          </button>
+
+          {/* Update Info */}
+          {updateStore.updateInfo() && (
+            <div class="border-t border-gray-200 pt-4 mt-2">
+              {updateStore.updateInfo()?.available ? (
+                <div class="space-y-2">
+                  <div class="flex items-center">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-2">
+                      Nueva versión disponible
+                    </span>
+                    <span class="text-sm font-mono text-green-600">{updateStore.updateInfo()?.latest_version}</span>
+                  </div>
+                  {updateStore.updateInfo()?.published_at && (
+                    <p class="text-xs text-gray-500">
+                      Publicada: {new Date(updateStore.updateInfo()!.published_at!).toLocaleDateString('es-ES', {
+                        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                      })}
+                    </p>
+                  )}
+                  {updateStore.updateInfo()?.release_notes && (
+                    <div class="mt-3 p-3 bg-white rounded border border-gray-200">
+                      <h4 class="text-xs font-medium text-gray-700 mb-2">Notas de la versión:</h4>
+                      <div class="text-xs text-gray-600 whitespace-pre-wrap">{updateStore.updateInfo()?.release_notes}</div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p class="text-sm text-gray-500">Ya tienes la última versión</p>
+              )}
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleSaveUpdateConfig} class="space-y-4">
