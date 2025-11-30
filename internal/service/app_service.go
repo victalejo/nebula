@@ -12,7 +12,7 @@ import (
 	"github.com/victalejo/nebula/internal/core/storage"
 )
 
-// AppService handles application business logic
+// AppService handles application/project business logic
 type AppService struct {
 	store storage.Store
 	log   logger.Logger
@@ -26,52 +26,46 @@ func NewAppService(store storage.Store, log logger.Logger) *AppService {
 	}
 }
 
-// CreateAppRequest represents a request to create an application
+// CreateAppRequest represents a request to create an application/project
 type CreateAppRequest struct {
 	Name           string                  `json:"name" binding:"required"`
-	DeploymentMode deployer.DeploymentMode `json:"deployment_mode" binding:"required"`
-	Domain         string                  `json:"domain"`
+	DisplayName    string                  `json:"display_name"`
+	Description    string                  `json:"description"`
+	DeploymentMode deployer.DeploymentMode `json:"deployment_mode"` // legacy, used to auto-create service
+	Domain         string                  `json:"domain"`          // legacy
 	GitRepo        string                  `json:"git_repo"`
 	GitBranch      string                  `json:"git_branch"`
-	DockerImage    string                  `json:"docker_image"`
+	DockerImage    string                  `json:"docker_image"` // legacy
 	Environment    map[string]string       `json:"environment"`
 }
 
-// AppResponse represents an application response
+// AppResponse represents an application/project response
 type AppResponse struct {
 	ID             string                  `json:"id"`
 	Name           string                  `json:"name"`
-	DeploymentMode deployer.DeploymentMode `json:"deployment_mode"`
-	Domain         string                  `json:"domain"`
+	DisplayName    string                  `json:"display_name,omitempty"`
+	Description    string                  `json:"description,omitempty"`
+	DeploymentMode deployer.DeploymentMode `json:"deployment_mode"` // legacy compatibility
+	Domain         string                  `json:"domain"`          // legacy compatibility
 	GitRepo        string                  `json:"git_repo,omitempty"`
 	GitBranch      string                  `json:"git_branch,omitempty"`
-	DockerImage    string                  `json:"docker_image,omitempty"`
+	DockerImage    string                  `json:"docker_image,omitempty"` // legacy compatibility
 	Environment    map[string]string       `json:"environment"`
 	CreatedAt      string                  `json:"created_at"`
 	UpdatedAt      string                  `json:"updated_at"`
 }
 
-// Create creates a new application
+// Create creates a new application/project
 func (s *AppService) Create(ctx context.Context, req CreateAppRequest) (*AppResponse, error) {
-	s.log.Info("creating application", "name", req.Name, "mode", req.DeploymentMode)
+	s.log.Info("creating project", "name", req.Name)
 
-	// Check if app already exists
+	// Check if project already exists
 	existing, err := s.store.Apps().GetByName(ctx, req.Name)
 	if err != nil {
-		return nil, apperrors.NewInternalError("failed to check existing app", err)
+		return nil, apperrors.NewInternalError("failed to check existing project", err)
 	}
 	if existing != nil {
-		return nil, apperrors.NewConflictError("application with this name already exists")
-	}
-
-	// Validate deployment mode
-	if req.DeploymentMode != deployer.ModeGit &&
-		req.DeploymentMode != deployer.ModeImage &&
-		req.DeploymentMode != deployer.ModeCompose {
-		return nil, apperrors.NewValidationError("invalid deployment mode", map[string]interface{}{
-			"deployment_mode": req.DeploymentMode,
-			"allowed":         []string{string(deployer.ModeGit), string(deployer.ModeImage), string(deployer.ModeCompose)},
-		})
+		return nil, apperrors.NewConflictError("project with this name already exists")
 	}
 
 	// Encode environment
@@ -84,103 +78,141 @@ func (s *AppService) Create(ctx context.Context, req CreateAppRequest) (*AppResp
 		envJSON = string(data)
 	}
 
-	app := &storage.Application{
-		ID:             uuid.New().String(),
-		Name:           req.Name,
-		DeploymentMode: string(req.DeploymentMode),
-		Domain:         req.Domain,
-		GitRepo:        req.GitRepo,
-		GitBranch:      req.GitBranch,
-		DockerImage:    req.DockerImage,
-		Environment:    envJSON,
+	project := &storage.Project{
+		ID:          uuid.New().String(),
+		Name:        req.Name,
+		DisplayName: req.DisplayName,
+		Description: req.Description,
+		GitRepo:     req.GitRepo,
+		GitBranch:   req.GitBranch,
+		Environment: envJSON,
 	}
 
-	if err := s.store.Apps().Create(ctx, app); err != nil {
-		return nil, apperrors.NewInternalError("failed to create application", err)
+	if err := s.store.Apps().Create(ctx, project); err != nil {
+		return nil, apperrors.NewInternalError("failed to create project", err)
 	}
 
-	s.log.Info("application created", "id", app.ID, "name", app.Name)
+	// Auto-create a "main" service if deployment mode is provided (legacy compatibility)
+	if req.DeploymentMode != "" {
+		builder := storage.BuilderNixpacks
+		if req.DeploymentMode == deployer.ModeImage {
+			builder = storage.BuilderDockerImage
+		}
 
-	return s.toResponse(app), nil
-}
+		mainService := &storage.Service{
+			ID:          uuid.New().String(),
+			ProjectID:   project.ID,
+			Name:        "main",
+			Type:        storage.ServiceTypeWeb,
+			Builder:     builder,
+			GitRepo:     req.GitRepo,
+			GitBranch:   req.GitBranch,
+			DockerImage: req.DockerImage,
+			Port:        8080,
+			Environment: "{}",
+			Status:      "stopped",
+		}
 
-// Get retrieves an application by ID or name
-func (s *AppService) Get(ctx context.Context, idOrName string) (*AppResponse, error) {
-	// Try by ID first
-	app, err := s.store.Apps().GetByID(ctx, idOrName)
-	if err != nil {
-		return nil, apperrors.NewInternalError("failed to get application", err)
-	}
-
-	// If not found by ID, try by name
-	if app == nil {
-		app, err = s.store.Apps().GetByName(ctx, idOrName)
-		if err != nil {
-			return nil, apperrors.NewInternalError("failed to get application", err)
+		if err := s.store.Services().Create(ctx, mainService); err != nil {
+			s.log.Warn("failed to create main service", "error", err)
 		}
 	}
 
-	if app == nil {
-		return nil, apperrors.NewNotFoundError("application", idOrName)
-	}
+	s.log.Info("project created", "id", project.ID, "name", project.Name)
 
-	return s.toResponse(app), nil
+	return s.toResponse(ctx, project), nil
 }
 
-// GetByName retrieves an application by name
+// Get retrieves an application/project by ID or name
+func (s *AppService) Get(ctx context.Context, idOrName string) (*AppResponse, error) {
+	// Try by ID first
+	project, err := s.store.Apps().GetByID(ctx, idOrName)
+	if err != nil {
+		return nil, apperrors.NewInternalError("failed to get project", err)
+	}
+
+	// If not found by ID, try by name
+	if project == nil {
+		project, err = s.store.Apps().GetByName(ctx, idOrName)
+		if err != nil {
+			return nil, apperrors.NewInternalError("failed to get project", err)
+		}
+	}
+
+	if project == nil {
+		return nil, apperrors.NewNotFoundError("project", idOrName)
+	}
+
+	return s.toResponse(ctx, project), nil
+}
+
+// GetByName retrieves an application/project by name
 func (s *AppService) GetByName(ctx context.Context, name string) (*AppResponse, error) {
-	app, err := s.store.Apps().GetByName(ctx, name)
+	project, err := s.store.Apps().GetByName(ctx, name)
 	if err != nil {
-		return nil, apperrors.NewInternalError("failed to get application", err)
+		return nil, apperrors.NewInternalError("failed to get project", err)
 	}
-	if app == nil {
-		return nil, apperrors.NewNotFoundError("application", name)
+	if project == nil {
+		return nil, apperrors.NewNotFoundError("project", name)
 	}
 
-	return s.toResponse(app), nil
+	return s.toResponse(ctx, project), nil
 }
 
-// List returns all applications
+// List returns all applications/projects
 func (s *AppService) List(ctx context.Context) ([]*AppResponse, error) {
-	apps, err := s.store.Apps().List(ctx)
+	projects, err := s.store.Apps().List(ctx)
 	if err != nil {
-		return nil, apperrors.NewInternalError("failed to list applications", err)
+		return nil, apperrors.NewInternalError("failed to list projects", err)
 	}
 
-	responses := make([]*AppResponse, len(apps))
-	for i, app := range apps {
-		responses[i] = s.toResponse(app)
+	responses := make([]*AppResponse, len(projects))
+	for i, project := range projects {
+		responses[i] = s.toResponse(ctx, project)
 	}
 
 	return responses, nil
 }
 
-// UpdateAppRequest represents a request to update an application
+// UpdateAppRequest represents a request to update an application/project
 type UpdateAppRequest struct {
-	Domain      *string           `json:"domain"`
+	DisplayName *string           `json:"display_name"`
+	Description *string           `json:"description"`
+	Domain      *string           `json:"domain"` // legacy
+	GitRepo     *string           `json:"git_repo"`
+	GitBranch   *string           `json:"git_branch"`
 	Environment map[string]string `json:"environment"`
 }
 
-// Update updates an application
+// Update updates an application/project
 func (s *AppService) Update(ctx context.Context, idOrName string, req UpdateAppRequest) (*AppResponse, error) {
 	// Try by ID first
-	app, err := s.store.Apps().GetByID(ctx, idOrName)
+	project, err := s.store.Apps().GetByID(ctx, idOrName)
 	if err != nil {
-		return nil, apperrors.NewInternalError("failed to get application", err)
+		return nil, apperrors.NewInternalError("failed to get project", err)
 	}
 	// If not found by ID, try by name
-	if app == nil {
-		app, err = s.store.Apps().GetByName(ctx, idOrName)
+	if project == nil {
+		project, err = s.store.Apps().GetByName(ctx, idOrName)
 		if err != nil {
-			return nil, apperrors.NewInternalError("failed to get application", err)
+			return nil, apperrors.NewInternalError("failed to get project", err)
 		}
 	}
-	if app == nil {
-		return nil, apperrors.NewNotFoundError("application", idOrName)
+	if project == nil {
+		return nil, apperrors.NewNotFoundError("project", idOrName)
 	}
 
-	if req.Domain != nil {
-		app.Domain = *req.Domain
+	if req.DisplayName != nil {
+		project.DisplayName = *req.DisplayName
+	}
+	if req.Description != nil {
+		project.Description = *req.Description
+	}
+	if req.GitRepo != nil {
+		project.GitRepo = *req.GitRepo
+	}
+	if req.GitBranch != nil {
+		project.GitBranch = *req.GitBranch
 	}
 
 	if req.Environment != nil {
@@ -188,63 +220,81 @@ func (s *AppService) Update(ctx context.Context, idOrName string, req UpdateAppR
 		if err != nil {
 			return nil, apperrors.NewInternalError("failed to encode environment", err)
 		}
-		app.Environment = string(data)
+		project.Environment = string(data)
 	}
 
-	if err := s.store.Apps().Update(ctx, app); err != nil {
-		return nil, apperrors.NewInternalError("failed to update application", err)
+	if err := s.store.Apps().Update(ctx, project); err != nil {
+		return nil, apperrors.NewInternalError("failed to update project", err)
 	}
 
-	s.log.Info("application updated", "id", app.ID)
+	s.log.Info("project updated", "id", project.ID)
 
-	return s.toResponse(app), nil
+	return s.toResponse(ctx, project), nil
 }
 
-// Delete deletes an application
+// Delete deletes an application/project
 func (s *AppService) Delete(ctx context.Context, idOrName string) error {
 	// Try by ID first
-	app, err := s.store.Apps().GetByID(ctx, idOrName)
+	project, err := s.store.Apps().GetByID(ctx, idOrName)
 	if err != nil {
-		return apperrors.NewInternalError("failed to get application", err)
+		return apperrors.NewInternalError("failed to get project", err)
 	}
 	// If not found by ID, try by name
-	if app == nil {
-		app, err = s.store.Apps().GetByName(ctx, idOrName)
+	if project == nil {
+		project, err = s.store.Apps().GetByName(ctx, idOrName)
 		if err != nil {
-			return apperrors.NewInternalError("failed to get application", err)
+			return apperrors.NewInternalError("failed to get project", err)
 		}
 	}
-	if app == nil {
-		return apperrors.NewNotFoundError("application", idOrName)
+	if project == nil {
+		return apperrors.NewNotFoundError("project", idOrName)
 	}
 
 	// TODO: Stop and remove containers, delete routes
 
-	if err := s.store.Apps().Delete(ctx, app.ID); err != nil {
-		return apperrors.NewInternalError("failed to delete application", err)
+	if err := s.store.Apps().Delete(ctx, project.ID); err != nil {
+		return apperrors.NewInternalError("failed to delete project", err)
 	}
 
-	s.log.Info("application deleted", "id", app.ID)
+	s.log.Info("project deleted", "id", project.ID)
 
 	return nil
 }
 
-func (s *AppService) toResponse(app *storage.Application) *AppResponse {
+func (s *AppService) toResponse(ctx context.Context, project *storage.Project) *AppResponse {
 	var env map[string]string
-	if app.Environment != "" {
-		json.Unmarshal([]byte(app.Environment), &env)
+	if project.Environment != "" {
+		json.Unmarshal([]byte(project.Environment), &env)
 	}
 
-	return &AppResponse{
-		ID:             app.ID,
-		Name:           app.Name,
-		DeploymentMode: deployer.DeploymentMode(app.DeploymentMode),
-		Domain:         app.Domain,
-		GitRepo:        app.GitRepo,
-		GitBranch:      app.GitBranch,
-		DockerImage:    app.DockerImage,
-		Environment:    env,
-		CreatedAt:      app.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:      app.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+	response := &AppResponse{
+		ID:          project.ID,
+		Name:        project.Name,
+		DisplayName: project.DisplayName,
+		Description: project.Description,
+		GitRepo:     project.GitRepo,
+		GitBranch:   project.GitBranch,
+		Environment: env,
+		CreatedAt:   project.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:   project.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
+
+	// Legacy compatibility: get info from "main" service if exists
+	mainService, _ := s.store.Services().GetByProjectIDAndName(ctx, project.ID, "main")
+	if mainService != nil {
+		response.DockerImage = mainService.DockerImage
+		if mainService.Builder == storage.BuilderDockerImage {
+			response.DeploymentMode = deployer.ModeImage
+		} else {
+			response.DeploymentMode = deployer.ModeGit
+		}
+	}
+
+	// Legacy: get domain from domains table
+	domains, _ := s.store.Domains().ListByProjectID(ctx, project.ID)
+	if len(domains) > 0 {
+		response.Domain = domains[0].Domain
+	}
+
+	return response
 }
