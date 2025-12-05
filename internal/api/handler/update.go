@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -82,7 +83,7 @@ func (h *UpdateHandler) ApplyUpdate(c *gin.Context) {
 
 	// Start the download and apply process asynchronously
 	go func() {
-		if err := h.updateService.DownloadAndApply(c.Request.Context()); err != nil {
+		if err := h.updateService.DownloadAndApply(context.Background()); err != nil {
 			h.log.Error("failed to apply update", "error", err)
 		}
 	}()
@@ -103,7 +104,7 @@ func (h *UpdateHandler) DownloadUpdate(c *gin.Context) {
 	}
 
 	go func() {
-		if err := h.updateService.DownloadAndApply(c.Request.Context()); err != nil {
+		if err := h.updateService.DownloadAndApply(context.Background()); err != nil {
 			h.log.Error("failed to download update", "error", err)
 		}
 	}()
@@ -140,7 +141,7 @@ func (h *UpdateHandler) Rollback(c *gin.Context) {
 	}
 
 	go func() {
-		if err := h.updateService.Rollback(c.Request.Context(), backupID); err != nil {
+		if err := h.updateService.Rollback(context.Background(), backupID); err != nil {
 			h.log.Error("failed to rollback", "error", err, "backup_id", backupID)
 		}
 	}()
