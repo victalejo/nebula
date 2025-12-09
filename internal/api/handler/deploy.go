@@ -100,3 +100,26 @@ func (h *DeployHandler) GetDeployment(c *gin.Context) {
 		"data": deployment,
 	})
 }
+
+// DeployService deploys a specific service
+func (h *DeployHandler) DeployService(c *gin.Context) {
+	projectID := c.Param("id")
+	serviceName := c.Param("serviceName")
+
+	var req service.DeployServiceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// Allow empty body
+		req = service.DeployServiceRequest{}
+	}
+
+	deployment, err := h.deployService.DeployServiceByName(c.Request.Context(), projectID, serviceName, req)
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"data":    deployment,
+		"message": "deployment started",
+	})
+}

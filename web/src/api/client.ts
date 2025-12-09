@@ -209,6 +209,11 @@ class ApiClient {
     await this.delete(`/projects/${projectId}/services/${serviceName}`);
   }
 
+  async deployService(projectId: string, serviceName: string, environment?: Record<string, string>): Promise<Deployment> {
+    const result = await this.post<ApiResponse<Deployment>>(`/projects/${projectId}/services/${serviceName}/deploy`, { environment });
+    return result.data;
+  }
+
   // Domains
   async listProjectDomains(projectId: string): Promise<Domain[]> {
     const result = await this.get<ApiResponse<Domain[]>>(`/projects/${projectId}/domains`);

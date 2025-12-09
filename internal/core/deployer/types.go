@@ -111,6 +111,7 @@ type Route struct {
 type DeploymentSpec struct {
 	AppID       string
 	AppName     string
+	ServiceID   string
 	App         *Application
 	Source      SourceConfig
 	Environment map[string]string

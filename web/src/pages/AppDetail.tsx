@@ -65,6 +65,15 @@ const AppDetail: Component<AppDetailProps> = (props) => {
     }
   };
 
+  const handleDeployService = async (serviceName: string) => {
+    try {
+      await api.deployService(app()!.id, serviceName);
+      fetchData();
+    } catch (e) {
+      alert('Error al desplegar el servicio: ' + (e instanceof Error ? e.message : 'Error desconocido'));
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
       running: 'bg-green-100 text-green-700',
@@ -212,22 +221,44 @@ const AppDetail: Component<AppDetailProps> = (props) => {
                           <h3 class="font-semibold text-gray-900">{service.name}</h3>
                           <div class="flex items-center space-x-3 text-sm text-gray-500">
                             <span class="capitalize">{service.type}</span>
-                            <span>•</span>
-                            <span>{service.builder || 'N/A'}</span>
-                            {service.port && (
+                            {service.type === 'database' ? (
                               <>
                                 <span>•</span>
-                                <span>Puerto {service.port}</span>
+                                <span>{service.database_type} {service.database_version}</span>
+                              </>
+                            ) : (
+                              <>
+                                {service.builder && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{service.builder}</span>
+                                  </>
+                                )}
+                                {service.port && (
+                                  <>
+                                    <span>•</span>
+                                    <span>Puerto {service.port}</span>
+                                  </>
+                                )}
                               </>
                             )}
                           </div>
                         </div>
                       </div>
-                      <div class="flex items-center space-x-4">
+                      <div class="flex items-center space-x-3">
                         <span class={`px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(service.status)}`}>
                           {service.status}
                         </span>
                         <button
+                          type="button"
+                          onClick={() => handleDeployService(service.name)}
+                          class="btn btn-primary text-sm py-1 px-3"
+                          title="Desplegar servicio"
+                        >
+                          Desplegar
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleDeleteService(service.name)}
                           class="text-red-500 hover:text-red-700 p-1"
                           title="Eliminar servicio"
