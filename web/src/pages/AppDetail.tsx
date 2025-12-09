@@ -1,6 +1,7 @@
 import { Component, createSignal, onMount, For, Show } from 'solid-js';
 import api, { App, Service } from '../api/client';
 import CreateServiceModal from '../components/CreateServiceModal';
+import ServiceDetail from './ServiceDetail';
 
 interface AppDetailProps {
   appName: string;
@@ -13,6 +14,7 @@ const AppDetail: Component<AppDetailProps> = (props) => {
   const [loading, setLoading] = createSignal(true);
   const [showCreateService, setShowCreateService] = createSignal(false);
   const [deleting, setDeleting] = createSignal(false);
+  const [selectedService, setSelectedService] = createSignal<string | null>(null);
 
   const fetchData = async () => {
     try {
@@ -115,6 +117,21 @@ const AppDetail: Component<AppDetailProps> = (props) => {
     }
   };
 
+  // If a service is selected, show the ServiceDetail page
+  if (selectedService() && app()) {
+    return (
+      <ServiceDetail
+        projectId={app()!.id}
+        projectName={app()!.name}
+        serviceName={selectedService()!}
+        onBack={() => {
+          setSelectedService(null);
+          fetchData();
+        }}
+      />
+    );
+  }
+
   return (
     <Show when={!loading()} fallback={<LoadingSkeleton />}>
       <Show when={app()}>
@@ -213,12 +230,15 @@ const AppDetail: Component<AppDetailProps> = (props) => {
                 {(service) => (
                   <div class="card hover:shadow-md transition-shadow">
                     <div class="flex items-center justify-between">
-                      <div class="flex items-center space-x-4">
+                      <div
+                        class="flex items-center space-x-4 cursor-pointer flex-1"
+                        onClick={() => setSelectedService(service.name)}
+                      >
                         <div class="p-2 bg-gray-100 rounded-lg text-gray-600">
                           {getTypeIcon(service.type)}
                         </div>
                         <div>
-                          <h3 class="font-semibold text-gray-900">{service.name}</h3>
+                          <h3 class="font-semibold text-gray-900 hover:text-nebula-600">{service.name}</h3>
                           <div class="flex items-center space-x-3 text-sm text-gray-500">
                             <span class="capitalize">{service.type}</span>
                             {service.type === 'database' ? (

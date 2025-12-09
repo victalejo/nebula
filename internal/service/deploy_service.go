@@ -67,13 +67,15 @@ type RegistryAuthReq struct {
 
 // DeploymentResponse represents a deployment response
 type DeploymentResponse struct {
-	ID        string `json:"id"`
-	AppID     string `json:"app_id"`
-	ServiceID string `json:"service_id,omitempty"`
-	Version   string `json:"version"`
-	Slot      string `json:"slot"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"created_at"`
+	ID           string `json:"id"`
+	AppID        string `json:"app_id"`
+	ServiceID    string `json:"service_id,omitempty"`
+	Version      string `json:"version"`
+	Slot         string `json:"slot"`
+	Status       string `json:"status"`
+	ErrorMessage string `json:"error_message,omitempty"`
+	CreatedAt    string `json:"created_at"`
+	FinishedAt   string `json:"finished_at,omitempty"`
 }
 
 // DeployImage deploys an application from a Docker image
@@ -546,6 +548,58 @@ func (s *DeployService) ListDeployments(ctx context.Context, appIDOrName string)
 			Slot:      d.Slot,
 			Status:    d.Status,
 			CreatedAt: d.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		}
+	}
+
+	return responses, nil
+}
+
+// ListServiceDeployments returns all deployments for a specific service
+func (s *DeployService) ListServiceDeployments(ctx context.Context, projectID, serviceName string) ([]*DeploymentResponse, error) {
+	// Get the project
+	project, err := s.store.Apps().GetByID(ctx, projectID)
+	if err != nil {
+		return nil, apperrors.NewInternalError("failed to get project", err)
+	}
+	if project == nil {
+		project, err = s.store.Apps().GetByName(ctx, projectID)
+		if err != nil {
+			return nil, apperrors.NewInternalError("failed to get project", err)
+		}
+	}
+	if project == nil {
+		return nil, apperrors.NewNotFoundError("project", projectID)
+	}
+
+	// Get the service
+	service, err := s.store.Services().GetByProjectIDAndName(ctx, project.ID, serviceName)
+	if err != nil {
+		return nil, apperrors.NewInternalError("failed to get service", err)
+	}
+	if service == nil {
+		return nil, apperrors.NewNotFoundError("service", serviceName)
+	}
+
+	// Get deployments for this service
+	deployments, err := s.store.Deployments().ListByServiceID(ctx, service.ID)
+	if err != nil {
+		return nil, apperrors.NewInternalError("failed to list deployments", err)
+	}
+
+	responses := make([]*DeploymentResponse, len(deployments))
+	for i, d := range deployments {
+		responses[i] = &DeploymentResponse{
+			ID:           d.ID,
+			AppID:        d.AppID,
+			ServiceID:    d.ServiceID,
+			Version:      d.Version,
+			Slot:         d.Slot,
+			Status:       d.Status,
+			ErrorMessage: d.ErrorMessage,
+			CreatedAt:    d.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		}
+		if d.FinishedAt != nil {
+			responses[i].FinishedAt = d.FinishedAt.Format("2006-01-02T15:04:05Z")
 		}
 	}
 

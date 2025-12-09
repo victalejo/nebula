@@ -214,6 +214,11 @@ class ApiClient {
     return result.data;
   }
 
+  async listServiceDeployments(projectId: string, serviceName: string): Promise<Deployment[]> {
+    const result = await this.get<ApiResponse<Deployment[]>>(`/projects/${projectId}/services/${serviceName}/deployments`);
+    return result.data;
+  }
+
   // Domains
   async listProjectDomains(projectId: string): Promise<Domain[]> {
     const result = await this.get<ApiResponse<Domain[]>>(`/projects/${projectId}/domains`);

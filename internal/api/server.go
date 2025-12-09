@@ -175,6 +175,7 @@ func (s *Server) setupRoutes() {
 
 	// Service deployment routes
 	protected.POST("/projects/:id/services/:serviceName/deploy", deployHandler.DeployService)
+	protected.GET("/projects/:id/services/:serviceName/deployments", deployHandler.ListServiceDeployments)
 
 	// Log routes
 	logHandler := handler.NewLogHandler(s.log)

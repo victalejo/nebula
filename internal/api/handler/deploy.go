@@ -123,3 +123,19 @@ func (h *DeployHandler) DeployService(c *gin.Context) {
 		"message": "deployment started",
 	})
 }
+
+// ListServiceDeployments returns all deployments for a service
+func (h *DeployHandler) ListServiceDeployments(c *gin.Context) {
+	projectID := c.Param("id")
+	serviceName := c.Param("serviceName")
+
+	deployments, err := h.deployService.ListServiceDeployments(c.Request.Context(), projectID, serviceName)
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": deployments,
+	})
+}
