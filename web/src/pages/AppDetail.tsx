@@ -117,24 +117,12 @@ const AppDetail: Component<AppDetailProps> = (props) => {
     }
   };
 
-  // If a service is selected, show the ServiceDetail page
-  if (selectedService() && app()) {
-    return (
-      <ServiceDetail
-        projectId={app()!.id}
-        projectName={app()!.name}
-        serviceName={selectedService()!}
-        onBack={() => {
-          setSelectedService(null);
-          fetchData();
-        }}
-      />
-    );
-  }
-
   return (
-    <Show when={!loading()} fallback={<LoadingSkeleton />}>
-      <Show when={app()}>
+    <Show
+      when={selectedService() && app()}
+      fallback={
+        <Show when={!loading()} fallback={<LoadingSkeleton />}>
+          <Show when={app()}>
         <div>
           {/* Header */}
           <div class="flex items-center justify-between mb-8">
@@ -334,7 +322,19 @@ const AppDetail: Component<AppDetailProps> = (props) => {
             />
           </Show>
         </div>
-      </Show>
+          </Show>
+        </Show>
+      }
+    >
+      <ServiceDetail
+        projectId={app()!.id}
+        projectName={app()!.name}
+        serviceName={selectedService()!}
+        onBack={() => {
+          setSelectedService(null);
+          fetchData();
+        }}
+      />
     </Show>
   );
 };
