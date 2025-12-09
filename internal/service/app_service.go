@@ -92,32 +92,6 @@ func (s *AppService) Create(ctx context.Context, req CreateAppRequest) (*AppResp
 		return nil, apperrors.NewInternalError("failed to create project", err)
 	}
 
-	// Auto-create a "main" service if deployment mode is provided (legacy compatibility)
-	if req.DeploymentMode != "" {
-		builder := storage.BuilderNixpacks
-		if req.DeploymentMode == deployer.ModeImage {
-			builder = storage.BuilderDockerImage
-		}
-
-		mainService := &storage.Service{
-			ID:          uuid.New().String(),
-			ProjectID:   project.ID,
-			Name:        "main",
-			Type:        storage.ServiceTypeWeb,
-			Builder:     builder,
-			GitRepo:     req.GitRepo,
-			GitBranch:   req.GitBranch,
-			DockerImage: req.DockerImage,
-			Port:        8080,
-			Environment: "{}",
-			Status:      "stopped",
-		}
-
-		if err := s.store.Services().Create(ctx, mainService); err != nil {
-			s.log.Warn("failed to create main service", "error", err)
-		}
-	}
-
 	s.log.Info("project created", "id", project.ID, "name", project.Name)
 
 	return s.toResponse(ctx, project), nil
