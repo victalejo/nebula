@@ -651,6 +651,18 @@ func (s *UpdateService) saveRestartState() {
 func (s *UpdateService) restart(executable string) {
 	s.log.Info("restarting process...")
 
+	// Check if running as systemd service
+	if os.Getenv("INVOCATION_ID") != "" || s.isSystemdService() {
+		s.log.Info("detected systemd service, using systemctl restart")
+		cmd := exec.Command("systemctl", "restart", "nebula")
+		if err := cmd.Run(); err != nil {
+			s.log.Error("systemctl restart failed", "error", err)
+			// Fallback to exit - systemd will restart the service
+			os.Exit(0)
+		}
+		return
+	}
+
 	// Try syscall.Exec first (replaces current process)
 	args := os.Args
 	env := os.Environ()
@@ -669,6 +681,18 @@ func (s *UpdateService) restart(executable string) {
 		}
 		os.Exit(0)
 	}
+}
+
+func (s *UpdateService) isSystemdService() bool {
+	// Check if systemd is managing this process
+	if _, err := os.Stat("/run/systemd/system"); err == nil {
+		// Check if nebula service exists
+		cmd := exec.Command("systemctl", "is-active", "nebula")
+		if err := cmd.Run(); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func copyFile(src, dst string) error {
