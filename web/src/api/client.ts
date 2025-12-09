@@ -363,7 +363,8 @@ export interface Deployment {
   version: string;
   slot: 'blue' | 'green';
   status: 'pending' | 'preparing' | 'deploying' | 'running' | 'stopped' | 'failed';
-  container_ids: string[];
+  error_message?: string;
+  container_ids?: string[];
   created_at: string;
   finished_at?: string;
 }

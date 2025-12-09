@@ -222,28 +222,37 @@ const ServiceDetail: Component<ServiceDetailProps> = (props) => {
                 <tbody class="bg-white divide-y divide-gray-200">
                   <For each={deployments()}>
                     {(deployment) => (
-                      <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 text-sm font-mono text-gray-900">{deployment.version}</td>
-                        <td class="px-4 py-3 text-sm">
-                          <span class={`px-2 py-1 text-xs rounded ${deployment.slot === 'blue' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                            {deployment.slot}
-                          </span>
-                        </td>
-                        <td class="px-4 py-3 text-sm">
-                          <span class={`px-2 py-1 text-xs rounded-full ${getStatusBadge(deployment.status)}`}>
-                            {deployment.status}
-                          </span>
-                        </td>
-                        <td class="px-4 py-3 text-sm text-gray-500">{formatDate(deployment.created_at)}</td>
-                        <td class="px-4 py-3 text-sm">
-                          <button
-                            onClick={() => setSelectedDeployment(deployment)}
-                            class="text-nebula-600 hover:text-nebula-800 font-medium"
-                          >
-                            Ver Logs
-                          </button>
-                        </td>
-                      </tr>
+                      <>
+                        <tr class="hover:bg-gray-50">
+                          <td class="px-4 py-3 text-sm font-mono text-gray-900">{deployment.version}</td>
+                          <td class="px-4 py-3 text-sm">
+                            <span class={`px-2 py-1 text-xs rounded ${deployment.slot === 'blue' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                              {deployment.slot}
+                            </span>
+                          </td>
+                          <td class="px-4 py-3 text-sm">
+                            <span class={`px-2 py-1 text-xs rounded-full ${getStatusBadge(deployment.status)}`}>
+                              {deployment.status}
+                            </span>
+                          </td>
+                          <td class="px-4 py-3 text-sm text-gray-500">{formatDate(deployment.created_at)}</td>
+                          <td class="px-4 py-3 text-sm">
+                            <button
+                              onClick={() => setSelectedDeployment(deployment)}
+                              class="text-nebula-600 hover:text-nebula-800 font-medium"
+                            >
+                              Ver Logs
+                            </button>
+                          </td>
+                        </tr>
+                        <Show when={deployment.status === 'failed' && deployment.error_message}>
+                          <tr class="bg-red-50">
+                            <td colspan="5" class="px-4 py-2 text-sm text-red-700">
+                              <span class="font-medium">Error:</span> {deployment.error_message}
+                            </td>
+                          </tr>
+                        </Show>
+                      </>
                     )}
                   </For>
                 </tbody>
