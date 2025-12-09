@@ -11,6 +11,7 @@ import (
 
 	"github.com/victalejo/nebula/internal/api/handler"
 	"github.com/victalejo/nebula/internal/api/middleware"
+	nebulacontainer "github.com/victalejo/nebula/internal/core/container"
 	"github.com/victalejo/nebula/internal/core/logger"
 	"github.com/victalejo/nebula/internal/core/storage"
 	"github.com/victalejo/nebula/internal/service"
@@ -38,6 +39,8 @@ type Server struct {
 	deployService  *service.DeployService
 	updateService  *service.UpdateService
 	settingsStore  storage.SettingsRepository
+	containerRuntime nebulacontainer.ContainerRuntime
+	containerStore   storage.ContainerRepository
 	log            logger.Logger
 }
 
@@ -50,6 +53,8 @@ func NewServer(
 	deployService *service.DeployService,
 	updateService *service.UpdateService,
 	settingsStore storage.SettingsRepository,
+	containerRuntime nebulacontainer.ContainerRuntime,
+	containerStore storage.ContainerRepository,
 	log logger.Logger,
 ) *Server {
 	// Set Gin mode
@@ -58,15 +63,17 @@ func NewServer(
 	router := gin.New()
 
 	server := &Server{
-		config:         config,
-		router:         router,
-		appService:     appService,
-		serviceService: serviceService,
-		domainService:  domainService,
-		deployService:  deployService,
-		updateService:  updateService,
-		settingsStore:  settingsStore,
-		log:            log,
+		config:           config,
+		router:           router,
+		appService:       appService,
+		serviceService:   serviceService,
+		domainService:    domainService,
+		deployService:    deployService,
+		updateService:    updateService,
+		settingsStore:    settingsStore,
+		containerRuntime: containerRuntime,
+		containerStore:   containerStore,
+		log:              log,
 	}
 
 	server.setupMiddleware()
@@ -178,7 +185,7 @@ func (s *Server) setupRoutes() {
 	protected.GET("/projects/:id/services/:serviceName/deployments", deployHandler.ListServiceDeployments)
 
 	// Log routes
-	logHandler := handler.NewLogHandler(s.log)
+	logHandler := handler.NewLogHandler(s.containerRuntime, s.containerStore, s.log)
 	protected.GET("/apps/:id/logs", logHandler.StreamLogs)
 	protected.GET("/apps/:id/deployments/:did/logs", logHandler.StreamDeploymentLogs)
 

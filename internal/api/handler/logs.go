@@ -2,23 +2,29 @@ package handler
 
 import (
 	"bufio"
-	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
+	nebulacontainer "github.com/victalejo/nebula/internal/core/container"
 	"github.com/victalejo/nebula/internal/core/logger"
+	"github.com/victalejo/nebula/internal/core/storage"
 )
 
 // LogHandler handles log streaming endpoints
 type LogHandler struct {
-	log logger.Logger
+	runtime    nebulacontainer.ContainerRuntime
+	containers storage.ContainerRepository
+	log        logger.Logger
 }
 
 // NewLogHandler creates a new log handler
-func NewLogHandler(log logger.Logger) *LogHandler {
+func NewLogHandler(runtime nebulacontainer.ContainerRuntime, containers storage.ContainerRepository, log logger.Logger) *LogHandler {
 	return &LogHandler{
-		log: log,
+		runtime:    runtime,
+		containers: containers,
+		log:        log,
 	}
 }
 
@@ -40,8 +46,7 @@ func (h *LogHandler) StreamLogs(c *gin.Context) {
 
 	// TODO: Get container IDs for the app and stream logs from them
 	// For now, send a placeholder message
-
-	c.SSEvent("message", fmt.Sprintf("Log streaming for app %s (tail=%s, follow=%v)", appID, tail, follow))
+	c.SSEvent("message", "Log streaming for app "+appID+" (tail="+tail+")")
 	c.Writer.Flush()
 
 	if !follow {
@@ -50,10 +55,6 @@ func (h *LogHandler) StreamLogs(c *gin.Context) {
 
 	// For follow mode, keep connection open
 	notify := c.Request.Context().Done()
-
-	// Create a channel for log messages
-	// TODO: Implement actual log streaming from Docker containers
-
 	<-notify
 	h.log.Info("log stream closed", "app_id", appID)
 }
@@ -71,42 +72,84 @@ func (h *LogHandler) StreamDeploymentLogs(c *gin.Context) {
 	c.Header("Connection", "keep-alive")
 	c.Header("Transfer-Encoding", "chunked")
 
-	// Get follow parameter
+	// Get follow and tail parameters
 	follow := c.Query("follow") == "true"
-	tail := c.DefaultQuery("tail", "100")
+	tailStr := c.DefaultQuery("tail", "100")
 
-	// TODO: Get container IDs for the specific deployment and stream logs from them
-	// For now, send a placeholder message
-
-	c.SSEvent("message", fmt.Sprintf("Log streaming for deployment %s (app=%s, tail=%s, follow=%v)", deploymentID, appID, tail, follow))
-	c.Writer.Flush()
-
-	if !follow {
+	// Get containers for this deployment
+	containers, err := h.containers.ListByDeploymentID(c.Request.Context(), deploymentID)
+	if err != nil {
+		h.log.Error("failed to get containers", "error", err, "deployment_id", deploymentID)
+		c.SSEvent("error", "Error al obtener contenedores: "+err.Error())
+		c.Writer.Flush()
 		return
 	}
 
-	// For follow mode, keep connection open
-	notify := c.Request.Context().Done()
+	if len(containers) == 0 {
+		c.SSEvent("message", "No hay contenedores para este despliegue")
+		c.Writer.Flush()
+		return
+	}
 
-	// TODO: Implement actual log streaming from Docker containers for this deployment
+	// Stream logs from first container (usually there's only one per deployment)
+	container := containers[0]
+	h.log.Info("streaming logs from container", "container_id", container.ContainerID, "deployment_id", deploymentID)
 
-	<-notify
+	// Convert tail to int to validate
+	tailNum, _ := strconv.Atoi(tailStr)
+	if tailNum <= 0 {
+		tailNum = 100
+	}
+
+	// Get logs from Docker
+	logReader, err := h.runtime.ContainerLogs(c.Request.Context(), container.ContainerID, nebulacontainer.LogOptions{
+		Follow:     follow,
+		Tail:       tailStr,
+		Stdout:     true,
+		Stderr:     true,
+		Timestamps: true,
+	})
+	if err != nil {
+		h.log.Error("failed to get container logs", "error", err, "container_id", container.ContainerID)
+		c.SSEvent("error", "Error al obtener logs: "+err.Error())
+		c.Writer.Flush()
+		return
+	}
+	defer logReader.Close()
+
+	// Stream logs to client
+	h.streamContainerLogs(logReader, c)
+
 	h.log.Info("deployment log stream closed", "app_id", appID, "deployment_id", deploymentID)
 }
 
 // streamContainerLogs streams logs from a container (helper function)
-func streamContainerLogs(reader io.ReadCloser, c *gin.Context) {
-	defer reader.Close()
-
+func (h *LogHandler) streamContainerLogs(reader io.ReadCloser, c *gin.Context) {
 	scanner := bufio.NewScanner(reader)
+	// Increase buffer size for long log lines
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
+
 	for scanner.Scan() {
 		select {
 		case <-c.Request.Context().Done():
 			return
 		default:
 			line := scanner.Text()
-			c.SSEvent("log", line)
+			// Docker log format has 8 bytes header for stream type
+			// Skip header if present
+			if len(line) > 8 {
+				// Check if first byte indicates stdout(1) or stderr(2)
+				if line[0] == 1 || line[0] == 2 {
+					line = line[8:]
+				}
+			}
+			c.SSEvent("message", line)
 			c.Writer.Flush()
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		h.log.Error("error reading container logs", "error", err)
 	}
 }

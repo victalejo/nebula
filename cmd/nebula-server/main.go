@@ -100,7 +100,7 @@ func main() {
 		TokenDuration: time.Duration(cfg.Auth.TokenDuration) * time.Hour,
 		AdminUsername: cfg.Auth.AdminUsername,
 		AdminPassword: cfg.Auth.AdminPassword,
-	}, appService, serviceService, domainService, deployService, updateService, store.Settings(), log)
+	}, appService, serviceService, domainService, deployService, updateService, store.Settings(), dockerClient, store.Containers(), log)
 
 	// Start background update checker
 	go updateService.StartBackgroundChecker(context.Background())
