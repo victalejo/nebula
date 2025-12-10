@@ -54,11 +54,17 @@ type Service struct {
 	DockerImage  string // if builder=docker_image
 
 	// Database configuration (only for type=database)
-	DatabaseType    string // postgres, mysql, redis, mongodb
-	DatabaseVersion string
+	DatabaseType     string // postgres, mysql, redis, mongodb
+	DatabaseVersion  string
+	DatabaseHost     string // internal hostname for connection
+	DatabasePort     int    // internal port for connection
+	DatabaseUser     string
+	DatabasePassword string
+	DatabaseName     string
+	DatabaseExposed  bool // if true, exposed to internet
 
 	// Runtime configuration
-	Port        int
+	Port int
 	Command     string // custom start command
 	Environment string // JSON encoded, merged with Project.Environment
 	Replicas    int    // number of instances (default 1)

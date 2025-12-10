@@ -793,6 +793,15 @@ func (s *DeployService) deployDatabaseService(ctx context.Context, project *stor
 	var port int
 	env := make(map[string]string)
 
+	// Generate password if not already set
+	password := service.DatabasePassword
+	if password == "" {
+		password = "nebula_" + service.ID[:8]
+	}
+
+	// Container name for internal networking
+	containerHost := fmt.Sprintf("nebula-%s-db-%s", project.Name, service.Name)
+
 	switch service.DatabaseType {
 	case "postgres":
 		version := service.DatabaseVersion
@@ -801,8 +810,15 @@ func (s *DeployService) deployDatabaseService(ctx context.Context, project *stor
 		}
 		image = fmt.Sprintf("postgres:%s", version)
 		port = 5432
-		env["POSTGRES_PASSWORD"] = "nebula_" + service.ID[:8]
+		env["POSTGRES_PASSWORD"] = password
 		env["POSTGRES_DB"] = service.Name
+		env["POSTGRES_USER"] = "postgres"
+		// Store connection info
+		service.DatabaseUser = "postgres"
+		service.DatabasePassword = password
+		service.DatabaseName = service.Name
+		service.DatabasePort = port
+		service.DatabaseHost = containerHost
 	case "mysql":
 		version := service.DatabaseVersion
 		if version == "" {
@@ -810,8 +826,14 @@ func (s *DeployService) deployDatabaseService(ctx context.Context, project *stor
 		}
 		image = fmt.Sprintf("mysql:%s", version)
 		port = 3306
-		env["MYSQL_ROOT_PASSWORD"] = "nebula_" + service.ID[:8]
+		env["MYSQL_ROOT_PASSWORD"] = password
 		env["MYSQL_DATABASE"] = service.Name
+		// Store connection info
+		service.DatabaseUser = "root"
+		service.DatabasePassword = password
+		service.DatabaseName = service.Name
+		service.DatabasePort = port
+		service.DatabaseHost = containerHost
 	case "redis":
 		version := service.DatabaseVersion
 		if version == "" {
@@ -819,6 +841,12 @@ func (s *DeployService) deployDatabaseService(ctx context.Context, project *stor
 		}
 		image = fmt.Sprintf("redis:%s", version)
 		port = 6379
+		// Redis doesn't have users/databases by default
+		service.DatabaseUser = ""
+		service.DatabasePassword = ""
+		service.DatabaseName = ""
+		service.DatabasePort = port
+		service.DatabaseHost = containerHost
 	case "mongodb":
 		version := service.DatabaseVersion
 		if version == "" {
@@ -827,12 +855,21 @@ func (s *DeployService) deployDatabaseService(ctx context.Context, project *stor
 		image = fmt.Sprintf("mongo:%s", version)
 		port = 27017
 		env["MONGO_INITDB_ROOT_USERNAME"] = "admin"
-		env["MONGO_INITDB_ROOT_PASSWORD"] = "nebula_" + service.ID[:8]
+		env["MONGO_INITDB_ROOT_PASSWORD"] = password
+		// Store connection info
+		service.DatabaseUser = "admin"
+		service.DatabasePassword = password
+		service.DatabaseName = "admin"
+		service.DatabasePort = port
+		service.DatabaseHost = containerHost
 	default:
 		return nil, apperrors.NewValidationError("unsupported database type", map[string]interface{}{
 			"database_type": service.DatabaseType,
 		})
 	}
+
+	// Save connection info to service
+	s.store.Services().Update(ctx, service)
 
 	// Merge with request environment
 	for k, v := range req.Environment {

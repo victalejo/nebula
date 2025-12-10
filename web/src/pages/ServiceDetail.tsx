@@ -1,4 +1,4 @@
-import { Component, createSignal, onMount, For, Show } from 'solid-js';
+import { Component, createSignal, onMount, For, Show, createMemo } from 'solid-js';
 import api, { Service, Deployment } from '../api/client';
 import DeploymentLogsModal from '../components/DeploymentLogsModal';
 
@@ -15,6 +15,8 @@ const ServiceDetail: Component<ServiceDetailProps> = (props) => {
   const [loading, setLoading] = createSignal(true);
   const [deploying, setDeploying] = createSignal(false);
   const [selectedDeployment, setSelectedDeployment] = createSignal<Deployment | null>(null);
+  const [showPassword, setShowPassword] = createSignal(false);
+  const [copiedField, setCopiedField] = createSignal<string | null>(null);
 
   const fetchData = async () => {
     try {
@@ -91,6 +93,32 @@ const ServiceDetail: Component<ServiceDetailProps> = (props) => {
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleString();
+  };
+
+  const copyToClipboard = async (text: string, field: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const getConnectionString = () => {
+    const svc = service();
+    if (!svc || svc.type !== 'database') return '';
+
+    const { database_type, database_host, database_port, database_user, database_password, database_name } = svc;
+
+    switch (database_type) {
+      case 'postgres':
+        return `postgresql://${database_user}:${database_password}@${database_host}:${database_port}/${database_name}`;
+      case 'mysql':
+        return `mysql://${database_user}:${database_password}@${database_host}:${database_port}/${database_name}`;
+      case 'mongodb':
+        return `mongodb://${database_user}:${database_password}@${database_host}:${database_port}/${database_name}?authSource=admin`;
+      case 'redis':
+        return `redis://${database_host}:${database_port}`;
+      default:
+        return '';
+    }
   };
 
   return (
@@ -185,6 +213,161 @@ const ServiceDetail: Component<ServiceDetailProps> = (props) => {
               )}
             </dl>
           </div>
+
+          {/* Database Connection Info */}
+          <Show when={service()!.type === 'database' && service()!.database_host}>
+            <div class="card mb-6">
+              <h3 class="font-semibold text-gray-900 mb-4">Informacion de Conexion</h3>
+              <div class="space-y-4">
+                {/* Connection String */}
+                <div>
+                  <label class="text-sm text-gray-500 block mb-1">Connection String</label>
+                  <div class="flex items-center bg-gray-50 rounded-lg p-3 font-mono text-sm">
+                    <span class="flex-1 truncate">
+                      {showPassword() ? getConnectionString() : getConnectionString().replace(service()!.database_password || '', '••••••••')}
+                    </span>
+                    <button
+                      onClick={() => copyToClipboard(getConnectionString(), 'connection')}
+                      class="ml-2 p-1 hover:bg-gray-200 rounded"
+                      title="Copiar"
+                    >
+                      <Show when={copiedField() === 'connection'} fallback={
+                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      }>
+                        <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </Show>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Individual Fields */}
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <label class="text-sm text-gray-500 block mb-1">Host</label>
+                    <div class="flex items-center">
+                      <span class="font-mono text-sm text-gray-700">{service()!.database_host}</span>
+                      <button
+                        onClick={() => copyToClipboard(service()!.database_host || '', 'host')}
+                        class="ml-2 p-1 hover:bg-gray-100 rounded"
+                      >
+                        <Show when={copiedField() === 'host'} fallback={
+                          <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        }>
+                          <svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </Show>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="text-sm text-gray-500 block mb-1">Puerto</label>
+                    <span class="font-mono text-sm text-gray-700">{service()!.database_port}</span>
+                  </div>
+
+                  <Show when={service()!.database_user}>
+                    <div>
+                      <label class="text-sm text-gray-500 block mb-1">Usuario</label>
+                      <div class="flex items-center">
+                        <span class="font-mono text-sm text-gray-700">{service()!.database_user}</span>
+                        <button
+                          onClick={() => copyToClipboard(service()!.database_user || '', 'user')}
+                          class="ml-2 p-1 hover:bg-gray-100 rounded"
+                        >
+                          <Show when={copiedField() === 'user'} fallback={
+                            <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          }>
+                            <svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </Show>
+                        </button>
+                      </div>
+                    </div>
+                  </Show>
+
+                  <Show when={service()!.database_password}>
+                    <div>
+                      <label class="text-sm text-gray-500 block mb-1">Contrasena</label>
+                      <div class="flex items-center">
+                        <span class="font-mono text-sm text-gray-700">
+                          {showPassword() ? service()!.database_password : '••••••••'}
+                        </span>
+                        <button
+                          onClick={() => setShowPassword(!showPassword())}
+                          class="ml-2 p-1 hover:bg-gray-100 rounded"
+                          title={showPassword() ? 'Ocultar' : 'Mostrar'}
+                        >
+                          <Show when={showPassword()} fallback={
+                            <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          }>
+                            <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                            </svg>
+                          </Show>
+                        </button>
+                        <button
+                          onClick={() => copyToClipboard(service()!.database_password || '', 'password')}
+                          class="ml-1 p-1 hover:bg-gray-100 rounded"
+                        >
+                          <Show when={copiedField() === 'password'} fallback={
+                            <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          }>
+                            <svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </Show>
+                        </button>
+                      </div>
+                    </div>
+                  </Show>
+
+                  <Show when={service()!.database_name}>
+                    <div>
+                      <label class="text-sm text-gray-500 block mb-1">Base de Datos</label>
+                      <div class="flex items-center">
+                        <span class="font-mono text-sm text-gray-700">{service()!.database_name}</span>
+                        <button
+                          onClick={() => copyToClipboard(service()!.database_name || '', 'dbname')}
+                          class="ml-2 p-1 hover:bg-gray-100 rounded"
+                        >
+                          <Show when={copiedField() === 'dbname'} fallback={
+                            <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          }>
+                            <svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </Show>
+                        </button>
+                      </div>
+                    </div>
+                  </Show>
+                </div>
+
+                {/* Note about internal network */}
+                <div class="text-xs text-gray-500 bg-yellow-50 p-3 rounded-lg">
+                  <strong>Nota:</strong> Esta base de datos solo es accesible desde otros servicios en la red interna de Nebula.
+                  El host <code class="bg-yellow-100 px-1 rounded">{service()!.database_host}</code> solo resuelve dentro de la red Docker.
+                </div>
+              </div>
+            </div>
+          </Show>
 
           {/* Deployments Section */}
           <div class="mb-4">

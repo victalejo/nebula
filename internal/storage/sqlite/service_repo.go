@@ -24,10 +24,11 @@ func (r *ServiceRepository) Create(ctx context.Context, service *storage.Service
 		INSERT INTO services (
 			id, project_id, name, type,
 			builder, git_repo, git_branch, subdirectory, docker_image,
-			database_type, database_version,
+			database_type, database_version, database_host, database_port,
+			database_user, database_password, database_name, database_exposed,
 			port, command, environment, replicas, status,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
 	service.CreatedAt = now
@@ -61,6 +62,12 @@ func (r *ServiceRepository) Create(ctx context.Context, service *storage.Service
 		nullString(service.DockerImage),
 		nullString(service.DatabaseType),
 		nullString(service.DatabaseVersion),
+		nullString(service.DatabaseHost),
+		service.DatabasePort,
+		nullString(service.DatabaseUser),
+		nullString(service.DatabasePassword),
+		nullString(service.DatabaseName),
+		service.DatabaseExposed,
 		service.Port,
 		nullString(service.Command),
 		service.Environment,
@@ -79,6 +86,9 @@ func (r *ServiceRepository) GetByID(ctx context.Context, id string) (*storage.Se
 		       COALESCE(builder, 'nixpacks'), COALESCE(git_repo, ''), COALESCE(git_branch, ''),
 		       COALESCE(subdirectory, '.'), COALESCE(docker_image, ''),
 		       COALESCE(database_type, ''), COALESCE(database_version, ''),
+		       COALESCE(database_host, ''), COALESCE(database_port, 0),
+		       COALESCE(database_user, ''), COALESCE(database_password, ''),
+		       COALESCE(database_name, ''), COALESCE(database_exposed, 0),
 		       COALESCE(port, 8080), COALESCE(command, ''), COALESCE(environment, '{}'),
 		       COALESCE(replicas, 1), COALESCE(status, 'stopped'),
 		       created_at, updated_at
@@ -95,6 +105,9 @@ func (r *ServiceRepository) GetByProjectIDAndName(ctx context.Context, projectID
 		       COALESCE(builder, 'nixpacks'), COALESCE(git_repo, ''), COALESCE(git_branch, ''),
 		       COALESCE(subdirectory, '.'), COALESCE(docker_image, ''),
 		       COALESCE(database_type, ''), COALESCE(database_version, ''),
+		       COALESCE(database_host, ''), COALESCE(database_port, 0),
+		       COALESCE(database_user, ''), COALESCE(database_password, ''),
+		       COALESCE(database_name, ''), COALESCE(database_exposed, 0),
 		       COALESCE(port, 8080), COALESCE(command, ''), COALESCE(environment, '{}'),
 		       COALESCE(replicas, 1), COALESCE(status, 'stopped'),
 		       created_at, updated_at
@@ -119,6 +132,12 @@ func (r *ServiceRepository) scanService(row *sql.Row) (*storage.Service, error) 
 		&service.DockerImage,
 		&service.DatabaseType,
 		&service.DatabaseVersion,
+		&service.DatabaseHost,
+		&service.DatabasePort,
+		&service.DatabaseUser,
+		&service.DatabasePassword,
+		&service.DatabaseName,
+		&service.DatabaseExposed,
 		&service.Port,
 		&service.Command,
 		&service.Environment,
@@ -145,6 +164,9 @@ func (r *ServiceRepository) Update(ctx context.Context, service *storage.Service
 		SET name = ?, type = ?,
 		    builder = ?, git_repo = ?, git_branch = ?, subdirectory = ?, docker_image = ?,
 		    database_type = ?, database_version = ?,
+		    database_host = ?, database_port = ?,
+		    database_user = ?, database_password = ?,
+		    database_name = ?, database_exposed = ?,
 		    port = ?, command = ?, environment = ?, replicas = ?, status = ?,
 		    updated_at = ?
 		WHERE id = ?
@@ -160,6 +182,12 @@ func (r *ServiceRepository) Update(ctx context.Context, service *storage.Service
 		nullString(service.DockerImage),
 		nullString(service.DatabaseType),
 		nullString(service.DatabaseVersion),
+		nullString(service.DatabaseHost),
+		service.DatabasePort,
+		nullString(service.DatabaseUser),
+		nullString(service.DatabasePassword),
+		nullString(service.DatabaseName),
+		service.DatabaseExposed,
 		service.Port,
 		nullString(service.Command),
 		service.Environment,
@@ -185,6 +213,9 @@ func (r *ServiceRepository) ListByProjectID(ctx context.Context, projectID strin
 		       COALESCE(builder, 'nixpacks'), COALESCE(git_repo, ''), COALESCE(git_branch, ''),
 		       COALESCE(subdirectory, '.'), COALESCE(docker_image, ''),
 		       COALESCE(database_type, ''), COALESCE(database_version, ''),
+		       COALESCE(database_host, ''), COALESCE(database_port, 0),
+		       COALESCE(database_user, ''), COALESCE(database_password, ''),
+		       COALESCE(database_name, ''), COALESCE(database_exposed, 0),
 		       COALESCE(port, 8080), COALESCE(command, ''), COALESCE(environment, '{}'),
 		       COALESCE(replicas, 1), COALESCE(status, 'stopped'),
 		       created_at, updated_at
@@ -202,6 +233,9 @@ func (r *ServiceRepository) List(ctx context.Context) ([]*storage.Service, error
 		       COALESCE(builder, 'nixpacks'), COALESCE(git_repo, ''), COALESCE(git_branch, ''),
 		       COALESCE(subdirectory, '.'), COALESCE(docker_image, ''),
 		       COALESCE(database_type, ''), COALESCE(database_version, ''),
+		       COALESCE(database_host, ''), COALESCE(database_port, 0),
+		       COALESCE(database_user, ''), COALESCE(database_password, ''),
+		       COALESCE(database_name, ''), COALESCE(database_exposed, 0),
 		       COALESCE(port, 8080), COALESCE(command, ''), COALESCE(environment, '{}'),
 		       COALESCE(replicas, 1), COALESCE(status, 'stopped'),
 		       created_at, updated_at
@@ -233,6 +267,12 @@ func (r *ServiceRepository) scanServices(rows *sql.Rows, err error) ([]*storage.
 			&service.DockerImage,
 			&service.DatabaseType,
 			&service.DatabaseVersion,
+			&service.DatabaseHost,
+			&service.DatabasePort,
+			&service.DatabaseUser,
+			&service.DatabasePassword,
+			&service.DatabaseName,
+			&service.DatabaseExposed,
 			&service.Port,
 			&service.Command,
 			&service.Environment,

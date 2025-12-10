@@ -298,6 +298,13 @@ export interface Service {
   docker_image?: string;
   database_type?: string;
   database_version?: string;
+  // Database connection info
+  database_host?: string;
+  database_port?: number;
+  database_user?: string;
+  database_password?: string;
+  database_name?: string;
+  database_exposed?: boolean;
   port: number;
   command?: string;
   environment: Record<string, string>;

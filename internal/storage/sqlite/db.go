@@ -162,6 +162,13 @@ func (s *Store) Migrate() error {
 		"ALTER TABLE deployments ADD COLUMN service_id TEXT REFERENCES services(id)",
 		// Add logs column to deployments for storing logs of failed deployments
 		"ALTER TABLE deployments ADD COLUMN logs TEXT",
+		// Add database connection info to services
+		"ALTER TABLE services ADD COLUMN database_host TEXT",
+		"ALTER TABLE services ADD COLUMN database_port INTEGER DEFAULT 0",
+		"ALTER TABLE services ADD COLUMN database_user TEXT",
+		"ALTER TABLE services ADD COLUMN database_password TEXT",
+		"ALTER TABLE services ADD COLUMN database_name TEXT",
+		"ALTER TABLE services ADD COLUMN database_exposed INTEGER DEFAULT 0",
 	}
 	for _, alt := range v3Alterations {
 		s.db.Exec(alt)

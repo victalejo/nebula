@@ -54,12 +54,19 @@ type ServiceResponse struct {
 	DockerImage     string            `json:"docker_image,omitempty"`
 	DatabaseType    string            `json:"database_type,omitempty"`
 	DatabaseVersion string            `json:"database_version,omitempty"`
-	Port            int               `json:"port"`
-	Command         string            `json:"command,omitempty"`
-	Environment     map[string]string `json:"environment"`
-	Status          string            `json:"status"`
-	CreatedAt       string            `json:"created_at"`
-	UpdatedAt       string            `json:"updated_at"`
+	// Database connection info (only for type=database)
+	DatabaseHost     string `json:"database_host,omitempty"`
+	DatabasePort     int    `json:"database_port,omitempty"`
+	DatabaseUser     string `json:"database_user,omitempty"`
+	DatabasePassword string `json:"database_password,omitempty"`
+	DatabaseName     string `json:"database_name,omitempty"`
+	DatabaseExposed  bool   `json:"database_exposed,omitempty"`
+	Port             int               `json:"port"`
+	Command          string            `json:"command,omitempty"`
+	Environment      map[string]string `json:"environment"`
+	Status           string            `json:"status"`
+	CreatedAt        string            `json:"created_at"`
+	UpdatedAt        string            `json:"updated_at"`
 }
 
 // Create creates a new service within a project
@@ -346,22 +353,28 @@ func (s *ServiceService) toResponse(service *storage.Service) *ServiceResponse {
 	}
 
 	return &ServiceResponse{
-		ID:              service.ID,
-		ProjectID:       service.ProjectID,
-		Name:            service.Name,
-		Type:            string(service.Type),
-		Builder:         string(service.Builder),
-		GitRepo:         service.GitRepo,
-		GitBranch:       service.GitBranch,
-		Subdirectory:    service.Subdirectory,
-		DockerImage:     service.DockerImage,
-		DatabaseType:    service.DatabaseType,
-		DatabaseVersion: service.DatabaseVersion,
-		Port:            service.Port,
-		Command:         service.Command,
-		Environment:     env,
-		Status:          service.Status,
-		CreatedAt:       service.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:       service.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:               service.ID,
+		ProjectID:        service.ProjectID,
+		Name:             service.Name,
+		Type:             string(service.Type),
+		Builder:          string(service.Builder),
+		GitRepo:          service.GitRepo,
+		GitBranch:        service.GitBranch,
+		Subdirectory:     service.Subdirectory,
+		DockerImage:      service.DockerImage,
+		DatabaseType:     service.DatabaseType,
+		DatabaseVersion:  service.DatabaseVersion,
+		DatabaseHost:     service.DatabaseHost,
+		DatabasePort:     service.DatabasePort,
+		DatabaseUser:     service.DatabaseUser,
+		DatabasePassword: service.DatabasePassword,
+		DatabaseName:     service.DatabaseName,
+		DatabaseExposed:  service.DatabaseExposed,
+		Port:             service.Port,
+		Command:          service.Command,
+		Environment:      env,
+		Status:           service.Status,
+		CreatedAt:        service.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:        service.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 }
