@@ -107,6 +107,18 @@ type Route struct {
 	GreenPort  int    `json:"green_port,omitempty"`
 }
 
+// HealthCheckConfig holds custom health check configuration
+type HealthCheckConfig struct {
+	// Test command for Docker health check (e.g., ["CMD", "mysqladmin", "ping"])
+	// If nil, no Docker health check is configured (for databases)
+	Test []string
+	// Whether to skip HTTP-based health check in deployer
+	SkipHTTPCheck bool
+	// Extended timeout for services that take longer to start (e.g., databases)
+	MaxAttempts int
+	Interval    time.Duration
+}
+
 // DeploymentSpec contains all information needed for deployment
 type DeploymentSpec struct {
 	AppID       string
@@ -118,6 +130,9 @@ type DeploymentSpec struct {
 	EnvVars     map[string]string // Alias for Environment
 	TargetSlot  Slot
 	Slot        Slot // Alias for TargetSlot
+
+	// HealthCheck configuration (optional, uses defaults if nil)
+	HealthCheck *HealthCheckConfig
 
 	// Convenience accessors (populated from Source)
 	GitRepo     string

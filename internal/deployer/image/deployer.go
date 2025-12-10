@@ -18,6 +18,8 @@ type Deployer struct {
 	runtime container.ContainerRuntime
 	network string
 	log     logger.Logger
+	// lastHealthCheckConfig stores the health check config from the last deployment
+	lastHealthCheckConfig *deployer.HealthCheckConfig
 }
 
 // New creates a new image deployer
@@ -75,6 +77,9 @@ func (d *Deployer) Deploy(ctx context.Context, spec *deployer.DeploymentSpec) (*
 		"slot", spec.TargetSlot,
 	)
 
+	// Store health check config for later use
+	d.lastHealthCheckConfig = spec.HealthCheck
+
 	// Find available port
 	hostPort, err := findAvailablePort()
 	if err != nil {
@@ -112,13 +117,31 @@ func (d *Deployer) Deploy(ctx context.Context, spec *deployer.DeploymentSpec) (*
 		},
 		Networks: []string{d.network},
 		RestartPolicy: "unless-stopped",
-		HealthCheck: &container.HealthCheckConfig{
+	}
+
+	// Configure health check based on spec
+	if spec.HealthCheck != nil && spec.HealthCheck.SkipHTTPCheck {
+		// For databases and services that don't have HTTP endpoints
+		if len(spec.HealthCheck.Test) > 0 {
+			// Use custom health check command
+			config.HealthCheck = &container.HealthCheckConfig{
+				Test:        spec.HealthCheck.Test,
+				Interval:    30 * time.Second,
+				Timeout:     10 * time.Second,
+				Retries:     10,
+				StartPeriod: 60 * time.Second, // Give databases more time to initialize
+			}
+		}
+		// If Test is empty, no Docker health check (we'll just check running state)
+	} else {
+		// Default HTTP health check for web services
+		config.HealthCheck = &container.HealthCheckConfig{
 			Test:        []string{"CMD-SHELL", fmt.Sprintf("curl -f http://localhost:%d/ || exit 1", spec.Source.Port)},
 			Interval:    10 * time.Second,
 			Timeout:     5 * time.Second,
 			Retries:     3,
 			StartPeriod: 30 * time.Second,
-		},
+		}
 	}
 
 	// Ensure network exists
@@ -162,9 +185,22 @@ func (d *Deployer) HealthCheck(ctx context.Context, result *deployer.DeploymentR
 		}, nil
 	}
 
-	// Wait for container to be healthy
+	// Determine health check parameters
 	maxAttempts := 30
 	interval := 2 * time.Second
+	skipDockerHealthCheck := false
+
+	if d.lastHealthCheckConfig != nil {
+		if d.lastHealthCheckConfig.MaxAttempts > 0 {
+			maxAttempts = d.lastHealthCheckConfig.MaxAttempts
+		}
+		if d.lastHealthCheckConfig.Interval > 0 {
+			interval = d.lastHealthCheckConfig.Interval
+		}
+		// For databases without HTTP, we skip Docker health check waiting
+		// and just verify the container is running
+		skipDockerHealthCheck = d.lastHealthCheckConfig.SkipHTTPCheck && len(d.lastHealthCheckConfig.Test) == 0
+	}
 
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		allHealthy := true
@@ -179,6 +215,11 @@ func (d *Deployer) HealthCheck(ctx context.Context, result *deployer.DeploymentR
 			if info.State != "running" {
 				allHealthy = false
 				break
+			}
+
+			// If we should skip Docker health check, just verify running state
+			if skipDockerHealthCheck {
+				continue
 			}
 
 			// If health check is configured, wait for healthy status

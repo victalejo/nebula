@@ -851,6 +851,13 @@ func (s *DeployService) deployDatabaseService(ctx context.Context, project *stor
 		},
 		Environment: env,
 		TargetSlot:  targetSlot,
+		// Database services don't have HTTP endpoints, skip HTTP health check
+		// Just verify container is running
+		HealthCheck: &deployer.HealthCheckConfig{
+			SkipHTTPCheck: true,
+			MaxAttempts:   15, // Give databases more time to start
+			Interval:      3 * time.Second,
+		},
 	}
 
 	// Create deployment record
