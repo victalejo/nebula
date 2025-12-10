@@ -30,18 +30,19 @@ type ServerConfig struct {
 
 // Server represents the API server
 type Server struct {
-	config         ServerConfig
-	router         *gin.Engine
-	httpServer     *http.Server
-	appService     *service.AppService
-	serviceService *service.ServiceService
-	domainService  *service.DomainService
-	deployService  *service.DeployService
-	updateService  *service.UpdateService
-	settingsStore  storage.SettingsRepository
+	config           ServerConfig
+	router           *gin.Engine
+	httpServer       *http.Server
+	appService       *service.AppService
+	serviceService   *service.ServiceService
+	domainService    *service.DomainService
+	deployService    *service.DeployService
+	updateService    *service.UpdateService
+	settingsStore    storage.SettingsRepository
 	containerRuntime nebulacontainer.ContainerRuntime
 	containerStore   storage.ContainerRepository
-	log            logger.Logger
+	deploymentStore  storage.DeploymentRepository
+	log              logger.Logger
 }
 
 // NewServer creates a new API server
@@ -55,6 +56,7 @@ func NewServer(
 	settingsStore storage.SettingsRepository,
 	containerRuntime nebulacontainer.ContainerRuntime,
 	containerStore storage.ContainerRepository,
+	deploymentStore storage.DeploymentRepository,
 	log logger.Logger,
 ) *Server {
 	// Set Gin mode
@@ -73,6 +75,7 @@ func NewServer(
 		settingsStore:    settingsStore,
 		containerRuntime: containerRuntime,
 		containerStore:   containerStore,
+		deploymentStore:  deploymentStore,
 		log:              log,
 	}
 
@@ -185,7 +188,7 @@ func (s *Server) setupRoutes() {
 	protected.GET("/projects/:id/services/:serviceName/deployments", deployHandler.ListServiceDeployments)
 
 	// Log routes
-	logHandler := handler.NewLogHandler(s.containerRuntime, s.containerStore, s.log)
+	logHandler := handler.NewLogHandler(s.containerRuntime, s.containerStore, s.deploymentStore, s.log)
 	protected.GET("/apps/:id/logs", logHandler.StreamLogs)
 	protected.GET("/apps/:id/deployments/:did/logs", logHandler.StreamDeploymentLogs)
 

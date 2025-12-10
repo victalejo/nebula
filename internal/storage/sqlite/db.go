@@ -160,6 +160,8 @@ func (s *Store) Migrate() error {
 		"ALTER TABLE applications ADD COLUMN description TEXT",
 		// Add service_id to deployments
 		"ALTER TABLE deployments ADD COLUMN service_id TEXT REFERENCES services(id)",
+		// Add logs column to deployments for storing logs of failed deployments
+		"ALTER TABLE deployments ADD COLUMN logs TEXT",
 	}
 	for _, alt := range v3Alterations {
 		s.db.Exec(alt)

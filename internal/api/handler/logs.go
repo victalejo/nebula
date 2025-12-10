@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -14,17 +15,19 @@ import (
 
 // LogHandler handles log streaming endpoints
 type LogHandler struct {
-	runtime    nebulacontainer.ContainerRuntime
-	containers storage.ContainerRepository
-	log        logger.Logger
+	runtime     nebulacontainer.ContainerRuntime
+	containers  storage.ContainerRepository
+	deployments storage.DeploymentRepository
+	log         logger.Logger
 }
 
 // NewLogHandler creates a new log handler
-func NewLogHandler(runtime nebulacontainer.ContainerRuntime, containers storage.ContainerRepository, log logger.Logger) *LogHandler {
+func NewLogHandler(runtime nebulacontainer.ContainerRuntime, containers storage.ContainerRepository, deployments storage.DeploymentRepository, log logger.Logger) *LogHandler {
 	return &LogHandler{
-		runtime:    runtime,
-		containers: containers,
-		log:        log,
+		runtime:     runtime,
+		containers:  containers,
+		deployments: deployments,
+		log:         log,
 	}
 }
 
@@ -85,9 +88,9 @@ func (h *LogHandler) StreamDeploymentLogs(c *gin.Context) {
 		return
 	}
 
+	// If no containers, try to show stored logs from the deployment
 	if len(containers) == 0 {
-		c.SSEvent("message", "No hay contenedores para este despliegue")
-		c.Writer.Flush()
+		h.sendStoredLogs(c, deploymentID)
 		return
 	}
 
@@ -110,9 +113,9 @@ func (h *LogHandler) StreamDeploymentLogs(c *gin.Context) {
 		Timestamps: true,
 	})
 	if err != nil {
-		h.log.Error("failed to get container logs", "error", err, "container_id", container.ContainerID)
-		c.SSEvent("error", "Error al obtener logs: "+err.Error())
-		c.Writer.Flush()
+		h.log.Warn("failed to get container logs, trying stored logs", "error", err, "container_id", container.ContainerID)
+		// Container might not exist anymore, try to show stored logs
+		h.sendStoredLogs(c, deploymentID)
 		return
 	}
 	defer logReader.Close()
@@ -121,6 +124,37 @@ func (h *LogHandler) StreamDeploymentLogs(c *gin.Context) {
 	h.streamContainerLogs(logReader, c)
 
 	h.log.Info("deployment log stream closed", "app_id", appID, "deployment_id", deploymentID)
+}
+
+// sendStoredLogs sends stored logs from the deployment record
+func (h *LogHandler) sendStoredLogs(c *gin.Context, deploymentID string) {
+	deployment, err := h.deployments.GetByID(c.Request.Context(), deploymentID)
+	if err != nil || deployment == nil {
+		c.SSEvent("message", "No hay contenedores activos para este despliegue")
+		c.Writer.Flush()
+		return
+	}
+
+	if deployment.Logs == "" {
+		c.SSEvent("message", "No hay logs disponibles para este despliegue")
+		c.Writer.Flush()
+		return
+	}
+
+	// Send stored logs line by line
+	c.SSEvent("message", "--- Logs guardados del despliegue ---")
+	c.Writer.Flush()
+
+	lines := strings.Split(deployment.Logs, "\n")
+	for _, line := range lines {
+		if line != "" {
+			c.SSEvent("message", line)
+			c.Writer.Flush()
+		}
+	}
+
+	c.SSEvent("message", "--- Fin de logs guardados ---")
+	c.Writer.Flush()
 }
 
 // streamContainerLogs streams logs from a container (helper function)

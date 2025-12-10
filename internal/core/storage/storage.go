@@ -93,6 +93,7 @@ type Deployment struct {
 	SourceConfig string // JSON encoded
 	Environment  string // JSON encoded
 	ErrorMessage string
+	Logs         string // stored logs for failed deployments
 	CreatedAt    time.Time
 	StartedAt    *time.Time
 	FinishedAt   *time.Time

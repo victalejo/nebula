@@ -89,7 +89,7 @@ func main() {
 	appService := service.NewAppService(store, log)
 	serviceService := service.NewServiceService(store, log)
 	domainService := service.NewDomainService(store, log)
-	deployService := service.NewDeployService(store, registry, proxyManager, log)
+	deployService := service.NewDeployService(store, registry, proxyManager, dockerClient, log)
 	updateService := service.NewUpdateService(cfg.Update, store, log)
 
 	// Initialize API server
@@ -100,7 +100,7 @@ func main() {
 		TokenDuration: time.Duration(cfg.Auth.TokenDuration) * time.Hour,
 		AdminUsername: cfg.Auth.AdminUsername,
 		AdminPassword: cfg.Auth.AdminPassword,
-	}, appService, serviceService, domainService, deployService, updateService, store.Settings(), dockerClient, store.Containers(), log)
+	}, appService, serviceService, domainService, deployService, updateService, store.Settings(), dockerClient, store.Containers(), store.Deployments(), log)
 
 	// Start background update checker
 	go updateService.StartBackgroundChecker(context.Background())

@@ -1,13 +1,16 @@
 package service
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
+	nebulacontainer "github.com/victalejo/nebula/internal/core/container"
 	"github.com/victalejo/nebula/internal/core/deployer"
 	apperrors "github.com/victalejo/nebula/internal/core/errors"
 	"github.com/victalejo/nebula/internal/core/logger"
@@ -20,6 +23,7 @@ type DeployService struct {
 	store        storage.Store
 	registry     *deployer.DeployerRegistry
 	proxyManager proxy.ProxyManager
+	runtime      nebulacontainer.ContainerRuntime
 	log          logger.Logger
 }
 
@@ -28,12 +32,14 @@ func NewDeployService(
 	store storage.Store,
 	registry *deployer.DeployerRegistry,
 	proxyManager proxy.ProxyManager,
+	runtime nebulacontainer.ContainerRuntime,
 	log logger.Logger,
 ) *DeployService {
 	return &DeployService{
 		store:        store,
 		registry:     registry,
 		proxyManager: proxyManager,
+		runtime:      runtime,
 		log:          log,
 	}
 }
@@ -381,6 +387,10 @@ func (s *DeployService) executeDeployment(
 		if err != nil {
 			errMsg = err.Error()
 		}
+
+		// Capture logs before destroying the container
+		deployment.Logs = s.captureContainerLogs(ctx, result.ContainerIDs)
+
 		s.failDeployment(ctx, deployment, fmt.Errorf(errMsg))
 
 		// Cleanup failed deployment
@@ -944,6 +954,10 @@ func (s *DeployService) executeServiceDeployment(
 		if err != nil {
 			errMsg = err.Error()
 		}
+
+		// Capture logs before destroying the container
+		deployment.Logs = s.captureContainerLogs(ctx, result.ContainerIDs)
+
 		s.failServiceDeployment(ctx, service, deployment, fmt.Errorf(errMsg))
 
 		// Cleanup failed deployment
@@ -986,6 +1000,42 @@ func (s *DeployService) failServiceDeployment(ctx context.Context, service *stor
 
 	service.Status = "failed"
 	s.store.Services().Update(ctx, service)
+}
+
+// captureContainerLogs captures logs from containers and returns them as a string
+func (s *DeployService) captureContainerLogs(ctx context.Context, containerIDs []string) string {
+	if s.runtime == nil || len(containerIDs) == 0 {
+		return ""
+	}
+
+	var allLogs strings.Builder
+	for _, containerID := range containerIDs {
+		logReader, err := s.runtime.ContainerLogs(ctx, containerID, nebulacontainer.LogOptions{
+			Follow:     false,
+			Tail:       "500",
+			Stdout:     true,
+			Stderr:     true,
+			Timestamps: true,
+		})
+		if err != nil {
+			s.log.Warn("failed to get container logs", "container_id", containerID, "error", err)
+			continue
+		}
+
+		scanner := bufio.NewScanner(logReader)
+		for scanner.Scan() {
+			line := scanner.Text()
+			// Docker log format has 8 bytes header for stream type
+			if len(line) > 8 && (line[0] == 1 || line[0] == 2) {
+				line = line[8:]
+			}
+			allLogs.WriteString(line)
+			allLogs.WriteString("\n")
+		}
+		logReader.Close()
+	}
+
+	return allLogs.String()
 }
 
 // stopOldServiceDeployment stops the old deployment for a service

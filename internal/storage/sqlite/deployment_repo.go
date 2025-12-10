@@ -21,8 +21,8 @@ func NewDeploymentRepository(db *sql.DB) *DeploymentRepository {
 // Create creates a new deployment
 func (r *DeploymentRepository) Create(ctx context.Context, deployment *storage.Deployment) error {
 	query := `
-		INSERT INTO deployments (id, app_id, service_id, version, slot, status, source_config, environment, error_message, created_at, started_at, finished_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO deployments (id, app_id, service_id, version, slot, status, source_config, environment, error_message, logs, created_at, started_at, finished_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	deployment.CreatedAt = time.Now()
 
@@ -36,6 +36,7 @@ func (r *DeploymentRepository) Create(ctx context.Context, deployment *storage.D
 		deployment.SourceConfig,
 		deployment.Environment,
 		deployment.ErrorMessage,
+		deployment.Logs,
 		deployment.CreatedAt,
 		deployment.StartedAt,
 		deployment.FinishedAt,
@@ -46,7 +47,7 @@ func (r *DeploymentRepository) Create(ctx context.Context, deployment *storage.D
 // GetByID retrieves a deployment by ID
 func (r *DeploymentRepository) GetByID(ctx context.Context, id string) (*storage.Deployment, error) {
 	query := `
-		SELECT id, app_id, COALESCE(service_id, ''), version, slot, status, source_config, environment, error_message, created_at, started_at, finished_at
+		SELECT id, app_id, COALESCE(service_id, ''), version, slot, status, source_config, environment, error_message, COALESCE(logs, ''), created_at, started_at, finished_at
 		FROM deployments
 		WHERE id = ?
 	`
@@ -61,6 +62,7 @@ func (r *DeploymentRepository) GetByID(ctx context.Context, id string) (*storage
 		&d.SourceConfig,
 		&d.Environment,
 		&d.ErrorMessage,
+		&d.Logs,
 		&d.CreatedAt,
 		&d.StartedAt,
 		&d.FinishedAt,
@@ -78,12 +80,13 @@ func (r *DeploymentRepository) GetByID(ctx context.Context, id string) (*storage
 func (r *DeploymentRepository) Update(ctx context.Context, deployment *storage.Deployment) error {
 	query := `
 		UPDATE deployments
-		SET status = ?, error_message = ?, started_at = ?, finished_at = ?
+		SET status = ?, error_message = ?, logs = ?, started_at = ?, finished_at = ?
 		WHERE id = ?
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		deployment.Status,
 		deployment.ErrorMessage,
+		deployment.Logs,
 		deployment.StartedAt,
 		deployment.FinishedAt,
 		deployment.ID,
@@ -101,7 +104,7 @@ func (r *DeploymentRepository) Delete(ctx context.Context, id string) error {
 // ListByAppID returns all deployments for an application
 func (r *DeploymentRepository) ListByAppID(ctx context.Context, appID string) ([]*storage.Deployment, error) {
 	query := `
-		SELECT id, app_id, COALESCE(service_id, ''), version, slot, status, source_config, environment, error_message, created_at, started_at, finished_at
+		SELECT id, app_id, COALESCE(service_id, ''), version, slot, status, source_config, environment, error_message, COALESCE(logs, ''), created_at, started_at, finished_at
 		FROM deployments
 		WHERE app_id = ?
 		ORDER BY created_at DESC
@@ -112,7 +115,7 @@ func (r *DeploymentRepository) ListByAppID(ctx context.Context, appID string) ([
 // ListByServiceID returns all deployments for a service
 func (r *DeploymentRepository) ListByServiceID(ctx context.Context, serviceID string) ([]*storage.Deployment, error) {
 	query := `
-		SELECT id, app_id, COALESCE(service_id, ''), version, slot, status, source_config, environment, error_message, created_at, started_at, finished_at
+		SELECT id, app_id, COALESCE(service_id, ''), version, slot, status, source_config, environment, error_message, COALESCE(logs, ''), created_at, started_at, finished_at
 		FROM deployments
 		WHERE service_id = ?
 		ORDER BY created_at DESC
@@ -139,6 +142,7 @@ func (r *DeploymentRepository) scanDeployments(rows *sql.Rows, err error) ([]*st
 			&d.SourceConfig,
 			&d.Environment,
 			&d.ErrorMessage,
+			&d.Logs,
 			&d.CreatedAt,
 			&d.StartedAt,
 			&d.FinishedAt,
@@ -153,7 +157,7 @@ func (r *DeploymentRepository) scanDeployments(rows *sql.Rows, err error) ([]*st
 // GetLatestByAppID returns the latest deployment for an application
 func (r *DeploymentRepository) GetLatestByAppID(ctx context.Context, appID string) (*storage.Deployment, error) {
 	query := `
-		SELECT id, app_id, COALESCE(service_id, ''), version, slot, status, source_config, environment, error_message, created_at, started_at, finished_at
+		SELECT id, app_id, COALESCE(service_id, ''), version, slot, status, source_config, environment, error_message, COALESCE(logs, ''), created_at, started_at, finished_at
 		FROM deployments
 		WHERE app_id = ?
 		ORDER BY created_at DESC
@@ -170,6 +174,7 @@ func (r *DeploymentRepository) GetLatestByAppID(ctx context.Context, appID strin
 		&d.SourceConfig,
 		&d.Environment,
 		&d.ErrorMessage,
+		&d.Logs,
 		&d.CreatedAt,
 		&d.StartedAt,
 		&d.FinishedAt,
@@ -186,7 +191,7 @@ func (r *DeploymentRepository) GetLatestByAppID(ctx context.Context, appID strin
 // GetLatestByServiceID returns the latest deployment for a service
 func (r *DeploymentRepository) GetLatestByServiceID(ctx context.Context, serviceID string) (*storage.Deployment, error) {
 	query := `
-		SELECT id, app_id, COALESCE(service_id, ''), version, slot, status, source_config, environment, error_message, created_at, started_at, finished_at
+		SELECT id, app_id, COALESCE(service_id, ''), version, slot, status, source_config, environment, error_message, COALESCE(logs, ''), created_at, started_at, finished_at
 		FROM deployments
 		WHERE service_id = ?
 		ORDER BY created_at DESC
@@ -203,6 +208,7 @@ func (r *DeploymentRepository) GetLatestByServiceID(ctx context.Context, service
 		&d.SourceConfig,
 		&d.Environment,
 		&d.ErrorMessage,
+		&d.Logs,
 		&d.CreatedAt,
 		&d.StartedAt,
 		&d.FinishedAt,
@@ -219,7 +225,7 @@ func (r *DeploymentRepository) GetLatestByServiceID(ctx context.Context, service
 // GetByAppIDAndSlot returns the deployment for an application and slot
 func (r *DeploymentRepository) GetByAppIDAndSlot(ctx context.Context, appID string, slot string) (*storage.Deployment, error) {
 	query := `
-		SELECT id, app_id, COALESCE(service_id, ''), version, slot, status, source_config, environment, error_message, created_at, started_at, finished_at
+		SELECT id, app_id, COALESCE(service_id, ''), version, slot, status, source_config, environment, error_message, COALESCE(logs, ''), created_at, started_at, finished_at
 		FROM deployments
 		WHERE app_id = ? AND slot = ? AND status = 'running'
 		ORDER BY created_at DESC
@@ -236,6 +242,7 @@ func (r *DeploymentRepository) GetByAppIDAndSlot(ctx context.Context, appID stri
 		&d.SourceConfig,
 		&d.Environment,
 		&d.ErrorMessage,
+		&d.Logs,
 		&d.CreatedAt,
 		&d.StartedAt,
 		&d.FinishedAt,
@@ -252,7 +259,7 @@ func (r *DeploymentRepository) GetByAppIDAndSlot(ctx context.Context, appID stri
 // GetByServiceIDAndSlot returns the deployment for a service and slot
 func (r *DeploymentRepository) GetByServiceIDAndSlot(ctx context.Context, serviceID string, slot string) (*storage.Deployment, error) {
 	query := `
-		SELECT id, app_id, COALESCE(service_id, ''), version, slot, status, source_config, environment, error_message, created_at, started_at, finished_at
+		SELECT id, app_id, COALESCE(service_id, ''), version, slot, status, source_config, environment, error_message, COALESCE(logs, ''), created_at, started_at, finished_at
 		FROM deployments
 		WHERE service_id = ? AND slot = ? AND status = 'running'
 		ORDER BY created_at DESC
@@ -269,6 +276,7 @@ func (r *DeploymentRepository) GetByServiceIDAndSlot(ctx context.Context, servic
 		&d.SourceConfig,
 		&d.Environment,
 		&d.ErrorMessage,
+		&d.Logs,
 		&d.CreatedAt,
 		&d.StartedAt,
 		&d.FinishedAt,
