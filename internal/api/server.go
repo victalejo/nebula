@@ -12,6 +12,7 @@ import (
 	"github.com/victalejo/nebula/internal/api/handler"
 	"github.com/victalejo/nebula/internal/api/middleware"
 	nebulacontainer "github.com/victalejo/nebula/internal/core/container"
+	"github.com/victalejo/nebula/internal/core/events"
 	"github.com/victalejo/nebula/internal/core/logger"
 	"github.com/victalejo/nebula/internal/core/storage"
 	"github.com/victalejo/nebula/internal/service"
@@ -42,6 +43,7 @@ type Server struct {
 	containerRuntime nebulacontainer.ContainerRuntime
 	containerStore   storage.ContainerRepository
 	deploymentStore  storage.DeploymentRepository
+	eventBus         *events.EventBus
 	log              logger.Logger
 }
 
@@ -57,6 +59,7 @@ func NewServer(
 	containerRuntime nebulacontainer.ContainerRuntime,
 	containerStore storage.ContainerRepository,
 	deploymentStore storage.DeploymentRepository,
+	eventBus *events.EventBus,
 	log logger.Logger,
 ) *Server {
 	// Set Gin mode
@@ -76,6 +79,7 @@ func NewServer(
 		containerRuntime: containerRuntime,
 		containerStore:   containerStore,
 		deploymentStore:  deploymentStore,
+		eventBus:         eventBus,
 		log:              log,
 	}
 
@@ -191,6 +195,11 @@ func (s *Server) setupRoutes() {
 	logHandler := handler.NewLogHandler(s.containerRuntime, s.containerStore, s.deploymentStore, s.log)
 	protected.GET("/apps/:id/logs", logHandler.StreamLogs)
 	protected.GET("/apps/:id/deployments/:did/logs", logHandler.StreamDeploymentLogs)
+
+	// Status streaming routes (real-time updates via SSE)
+	statusHandler := handler.NewStatusHandler(s.eventBus, s.log)
+	protected.GET("/projects/:id/status/stream", statusHandler.StreamProjectStatus)
+	protected.GET("/status/stream", statusHandler.StreamGlobalStatus)
 
 	// Settings routes
 	settingsHandler := handler.NewSettingsHandler(s.settingsStore, s.log)

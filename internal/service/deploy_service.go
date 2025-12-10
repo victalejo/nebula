@@ -13,6 +13,7 @@ import (
 	nebulacontainer "github.com/victalejo/nebula/internal/core/container"
 	"github.com/victalejo/nebula/internal/core/deployer"
 	apperrors "github.com/victalejo/nebula/internal/core/errors"
+	"github.com/victalejo/nebula/internal/core/events"
 	"github.com/victalejo/nebula/internal/core/logger"
 	"github.com/victalejo/nebula/internal/core/proxy"
 	"github.com/victalejo/nebula/internal/core/storage"
@@ -24,6 +25,7 @@ type DeployService struct {
 	registry     *deployer.DeployerRegistry
 	proxyManager proxy.ProxyManager
 	runtime      nebulacontainer.ContainerRuntime
+	eventBus     *events.EventBus
 	log          logger.Logger
 }
 
@@ -33,6 +35,7 @@ func NewDeployService(
 	registry *deployer.DeployerRegistry,
 	proxyManager proxy.ProxyManager,
 	runtime nebulacontainer.ContainerRuntime,
+	eventBus *events.EventBus,
 	log logger.Logger,
 ) *DeployService {
 	return &DeployService{
@@ -40,6 +43,7 @@ func NewDeployService(
 		registry:     registry,
 		proxyManager: proxyManager,
 		runtime:      runtime,
+		eventBus:     eventBus,
 		log:          log,
 	}
 }
@@ -343,22 +347,24 @@ func (s *DeployService) executeDeployment(
 	deployment.Status = string(deployer.StatusPreparing)
 	deployment.StartedAt = &now
 	s.store.Deployments().Update(ctx, deployment)
+	s.publishDeploymentStatus(project.ID, "", deployment.ID, deployment.Status, "")
 
 	// Prepare (pull image)
 	_, err := dep.Prepare(ctx, spec)
 	if err != nil {
-		s.failDeployment(ctx, deployment, err)
+		s.failDeployment(ctx, deployment, project.ID, err)
 		return
 	}
 
 	// Update status to deploying
 	deployment.Status = string(deployer.StatusDeploying)
 	s.store.Deployments().Update(ctx, deployment)
+	s.publishDeploymentStatus(project.ID, "", deployment.ID, deployment.Status, "")
 
 	// Deploy (create and start container)
 	result, err := dep.Deploy(ctx, spec)
 	if err != nil {
-		s.failDeployment(ctx, deployment, err)
+		s.failDeployment(ctx, deployment, project.ID, err)
 		return
 	}
 
@@ -391,7 +397,7 @@ func (s *DeployService) executeDeployment(
 		// Capture logs before destroying the container
 		deployment.Logs = s.captureContainerLogs(ctx, result.ContainerIDs)
 
-		s.failDeployment(ctx, deployment, fmt.Errorf(errMsg))
+		s.failDeployment(ctx, deployment, project.ID, fmt.Errorf(errMsg))
 
 		// Cleanup failed deployment
 		dep.Destroy(ctx, result.ContainerIDs)
@@ -430,6 +436,7 @@ func (s *DeployService) executeDeployment(
 	deployment.Status = string(deployer.StatusRunning)
 	deployment.FinishedAt = &finishedAt
 	s.store.Deployments().Update(ctx, deployment)
+	s.publishDeploymentStatus(project.ID, "", deployment.ID, deployment.Status, "")
 
 	// Update route's active slot (legacy)
 	if route, _ := s.store.Routes().GetByAppID(ctx, project.ID); route != nil {
@@ -453,7 +460,7 @@ func (s *DeployService) executeDeployment(
 }
 
 // failDeployment marks a deployment as failed
-func (s *DeployService) failDeployment(ctx context.Context, deployment *storage.Deployment, err error) {
+func (s *DeployService) failDeployment(ctx context.Context, deployment *storage.Deployment, projectID string, err error) {
 	s.log.Error("deployment failed",
 		"deployment_id", deployment.ID,
 		"error", err,
@@ -464,6 +471,7 @@ func (s *DeployService) failDeployment(ctx context.Context, deployment *storage.
 	deployment.ErrorMessage = err.Error()
 	deployment.FinishedAt = &finishedAt
 	s.store.Deployments().Update(ctx, deployment)
+	s.publishDeploymentStatus(projectID, "", deployment.ID, deployment.Status, deployment.ErrorMessage)
 }
 
 // stopOldDeployment stops the old deployment
@@ -759,6 +767,7 @@ func (s *DeployService) DeployServiceByName(ctx context.Context, projectID, serv
 	// Update service status to building
 	service.Status = "building"
 	s.store.Services().Update(ctx, service)
+	s.publishServiceStatus(project.ID, service.ID, service.Status)
 
 	// Execute deployment asynchronously
 	go s.executeServiceDeployment(context.Background(), project, service, deployment, dep, spec)
@@ -920,6 +929,7 @@ func (s *DeployService) deployDatabaseService(ctx context.Context, project *stor
 	service.Status = "building"
 	service.Port = port
 	s.store.Services().Update(ctx, service)
+	s.publishServiceStatus(project.ID, service.ID, service.Status)
 
 	// Execute deployment asynchronously
 	go s.executeServiceDeployment(context.Background(), project, service, deployment, dep, spec)
@@ -954,22 +964,24 @@ func (s *DeployService) executeServiceDeployment(
 	deployment.Status = string(deployer.StatusPreparing)
 	deployment.StartedAt = &now
 	s.store.Deployments().Update(ctx, deployment)
+	s.publishDeploymentStatus(project.ID, service.ID, deployment.ID, deployment.Status, "")
 
 	// Prepare (pull image)
 	_, err := dep.Prepare(ctx, spec)
 	if err != nil {
-		s.failServiceDeployment(ctx, service, deployment, err)
+		s.failServiceDeployment(ctx, project.ID, service, deployment, err)
 		return
 	}
 
 	// Update status to deploying
 	deployment.Status = string(deployer.StatusDeploying)
 	s.store.Deployments().Update(ctx, deployment)
+	s.publishDeploymentStatus(project.ID, service.ID, deployment.ID, deployment.Status, "")
 
 	// Deploy (create and start container)
 	result, err := dep.Deploy(ctx, spec)
 	if err != nil {
-		s.failServiceDeployment(ctx, service, deployment, err)
+		s.failServiceDeployment(ctx, project.ID, service, deployment, err)
 		return
 	}
 
@@ -1002,7 +1014,7 @@ func (s *DeployService) executeServiceDeployment(
 		// Capture logs before destroying the container
 		deployment.Logs = s.captureContainerLogs(ctx, result.ContainerIDs)
 
-		s.failServiceDeployment(ctx, service, deployment, fmt.Errorf(errMsg))
+		s.failServiceDeployment(ctx, project.ID, service, deployment, fmt.Errorf(errMsg))
 
 		// Cleanup failed deployment
 		dep.Destroy(ctx, result.ContainerIDs)
@@ -1014,10 +1026,12 @@ func (s *DeployService) executeServiceDeployment(
 	deployment.Status = string(deployer.StatusRunning)
 	deployment.FinishedAt = &finishedAt
 	s.store.Deployments().Update(ctx, deployment)
+	s.publishDeploymentStatus(project.ID, service.ID, deployment.ID, deployment.Status, "")
 
 	// Update service status
 	service.Status = "running"
 	s.store.Services().Update(ctx, service)
+	s.publishServiceStatus(project.ID, service.ID, service.Status)
 
 	// Stop old deployment for this service
 	s.stopOldServiceDeployment(ctx, service.ID, string(spec.TargetSlot.Opposite()), dep)
@@ -1029,7 +1043,7 @@ func (s *DeployService) executeServiceDeployment(
 }
 
 // failServiceDeployment marks a service deployment as failed
-func (s *DeployService) failServiceDeployment(ctx context.Context, service *storage.Service, deployment *storage.Deployment, err error) {
+func (s *DeployService) failServiceDeployment(ctx context.Context, projectID string, service *storage.Service, deployment *storage.Deployment, err error) {
 	s.log.Error("service deployment failed",
 		"deployment_id", deployment.ID,
 		"service_id", service.ID,
@@ -1041,9 +1055,11 @@ func (s *DeployService) failServiceDeployment(ctx context.Context, service *stor
 	deployment.ErrorMessage = err.Error()
 	deployment.FinishedAt = &finishedAt
 	s.store.Deployments().Update(ctx, deployment)
+	s.publishDeploymentStatus(projectID, service.ID, deployment.ID, deployment.Status, deployment.ErrorMessage)
 
 	service.Status = "failed"
 	s.store.Services().Update(ctx, service)
+	s.publishServiceStatus(projectID, service.ID, service.Status)
 }
 
 // captureContainerLogs captures logs from containers and returns them as a string
@@ -1105,6 +1121,22 @@ func (s *DeployService) stopOldServiceDeployment(ctx context.Context, serviceID 
 
 	oldDeployment.Status = string(deployer.StatusStopped)
 	s.store.Deployments().Update(ctx, oldDeployment)
+}
+
+// publishDeploymentStatus publishes a deployment status change event
+func (s *DeployService) publishDeploymentStatus(projectID, serviceID, deploymentID, status, errorMessage string) {
+	if s.eventBus == nil {
+		return
+	}
+	s.eventBus.PublishDeploymentStatus(projectID, serviceID, deploymentID, status, errorMessage)
+}
+
+// publishServiceStatus publishes a service status change event
+func (s *DeployService) publishServiceStatus(projectID, serviceID, status string) {
+	if s.eventBus == nil {
+		return
+	}
+	s.eventBus.PublishServiceStatus(projectID, serviceID, status)
 }
 
 // getTargetSlotForService determines which slot to deploy a service to

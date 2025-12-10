@@ -1,7 +1,8 @@
 import { Component, createSignal, onMount, For, Show } from 'solid-js';
-import api, { App, Service } from '../api/client';
+import api, { App, Service, StatusEvent } from '../api/client';
 import CreateServiceModal from '../components/CreateServiceModal';
 import ServiceDetail from './ServiceDetail';
+import { useProjectStatusStream } from '../hooks/useStatusStream';
 
 interface AppDetailProps {
   appName: string;
@@ -30,6 +31,21 @@ const AppDetail: Component<AppDetailProps> = (props) => {
       setLoading(false);
     }
   };
+
+  // Real-time status updates via SSE
+  useProjectStatusStream(
+    () => app()?.id,
+    (event: StatusEvent) => {
+      // Update service status in the list
+      if (event.type === 'service_status' && event.service_id) {
+        setServices(prev => prev.map(s =>
+          s.id === event.service_id
+            ? { ...s, status: event.status }
+            : s
+        ));
+      }
+    }
+  );
 
   onMount(fetchData);
 

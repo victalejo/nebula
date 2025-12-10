@@ -15,6 +15,7 @@ import (
 	"github.com/victalejo/nebula/internal/container"
 	"github.com/victalejo/nebula/internal/container/docker"
 	"github.com/victalejo/nebula/internal/core/deployer"
+	"github.com/victalejo/nebula/internal/core/events"
 	"github.com/victalejo/nebula/internal/core/logger"
 	gitdeployer "github.com/victalejo/nebula/internal/deployer/git"
 	imagedeployer "github.com/victalejo/nebula/internal/deployer/image"
@@ -85,11 +86,14 @@ func main() {
 	gitDep := gitdeployer.New(runtimeAdapter, log, "./data", store.Settings())
 	registry.Register(gitDep)
 
+	// Initialize event bus for real-time status updates
+	eventBus := events.NewEventBus()
+
 	// Initialize services
 	appService := service.NewAppService(store, log)
 	serviceService := service.NewServiceService(store, log)
 	domainService := service.NewDomainService(store, log)
-	deployService := service.NewDeployService(store, registry, proxyManager, dockerClient, log)
+	deployService := service.NewDeployService(store, registry, proxyManager, dockerClient, eventBus, log)
 	updateService := service.NewUpdateService(cfg.Update, store, log)
 
 	// Initialize API server
@@ -100,7 +104,7 @@ func main() {
 		TokenDuration: time.Duration(cfg.Auth.TokenDuration) * time.Hour,
 		AdminUsername: cfg.Auth.AdminUsername,
 		AdminPassword: cfg.Auth.AdminPassword,
-	}, appService, serviceService, domainService, deployService, updateService, store.Settings(), dockerClient, store.Containers(), store.Deployments(), log)
+	}, appService, serviceService, domainService, deployService, updateService, store.Settings(), dockerClient, store.Containers(), store.Deployments(), eventBus, log)
 
 	// Start background update checker
 	go updateService.StartBackgroundChecker(context.Background())

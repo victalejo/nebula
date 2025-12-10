@@ -7,6 +7,13 @@ interface CreateServiceModalProps {
   onCreated: () => void;
 }
 
+const defaultVersions: Record<string, string> = {
+  postgres: '16',
+  mysql: '8.0',
+  redis: '7',
+  mongodb: '7'
+};
+
 const CreateServiceModal: Component<CreateServiceModalProps> = (props) => {
   const [name, setName] = createSignal('');
   const [type, setType] = createSignal<ServiceType>('web');
@@ -18,7 +25,7 @@ const CreateServiceModal: Component<CreateServiceModalProps> = (props) => {
   const [port, setPort] = createSignal(8080);
   const [command, setCommand] = createSignal('');
   const [databaseType, setDatabaseType] = createSignal('postgres');
-  const [databaseVersion, setDatabaseVersion] = createSignal('16');
+  const [databaseVersion, setDatabaseVersion] = createSignal(defaultVersions['postgres']);
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
@@ -103,7 +110,11 @@ const CreateServiceModal: Component<CreateServiceModalProps> = (props) => {
               <label class="label">Tipo de Base de Datos</label>
               <select
                 value={databaseType()}
-                onChange={(e) => setDatabaseType(e.currentTarget.value)}
+                onChange={(e) => {
+                  const dbType = e.currentTarget.value;
+                  setDatabaseType(dbType);
+                  setDatabaseVersion(defaultVersions[dbType] || '16');
+                }}
                 class="input"
               >
                 <option value="postgres">PostgreSQL</option>
@@ -119,7 +130,7 @@ const CreateServiceModal: Component<CreateServiceModalProps> = (props) => {
                 value={databaseVersion()}
                 onInput={(e) => setDatabaseVersion(e.currentTarget.value)}
                 class="input"
-                placeholder="16"
+                placeholder={defaultVersions[databaseType()]}
               />
             </div>
           </Show>

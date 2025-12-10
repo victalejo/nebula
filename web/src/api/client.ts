@@ -166,6 +166,24 @@ class ApiClient {
     return eventSource;
   }
 
+  // Status Streaming - returns EventSource for SSE (real-time status updates)
+  streamProjectStatus(projectId: string): EventSource {
+    const params = new URLSearchParams();
+    if (this.token) params.set('token', this.token);
+
+    const url = `${API_BASE}/projects/${projectId}/status/stream?${params.toString()}`;
+    return new EventSource(url);
+  }
+
+  // Global Status Streaming - returns EventSource for SSE (all projects)
+  streamGlobalStatus(): EventSource {
+    const params = new URLSearchParams();
+    if (this.token) params.set('token', this.token);
+
+    const url = `${API_BASE}/status/stream?${params.toString()}`;
+    return new EventSource(url);
+  }
+
   // Settings
   async getGitHubTokenStatus(): Promise<GitHubTokenStatus> {
     return this.get<GitHubTokenStatus>('/settings/github-token');
@@ -408,6 +426,17 @@ export interface DeployGitRequest {
 
 export interface GitHubTokenStatus {
   configured: boolean;
+}
+
+// Real-time status event from SSE stream
+export interface StatusEvent {
+  type: 'deployment_status' | 'service_status';
+  deployment_id?: string;
+  service_id?: string;
+  project_id: string;
+  status: string;
+  error_message?: string;
+  timestamp: string;
 }
 
 export const api = new ApiClient();

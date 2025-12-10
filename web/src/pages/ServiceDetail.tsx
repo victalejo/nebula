@@ -1,6 +1,7 @@
 import { Component, createSignal, onMount, For, Show, createMemo } from 'solid-js';
-import api, { Service, Deployment } from '../api/client';
+import api, { Service, Deployment, StatusEvent } from '../api/client';
 import DeploymentLogsModal from '../components/DeploymentLogsModal';
+import { useProjectStatusStream } from '../hooks/useStatusStream';
 
 interface ServiceDetailProps {
   projectId: string;
@@ -32,6 +33,25 @@ const ServiceDetail: Component<ServiceDetailProps> = (props) => {
       setLoading(false);
     }
   };
+
+  // Real-time status updates via SSE
+  useProjectStatusStream(
+    () => props.projectId,
+    (event: StatusEvent) => {
+      // Update deployment status
+      if (event.type === 'deployment_status' && event.deployment_id) {
+        setDeployments(prev => prev.map(d =>
+          d.id === event.deployment_id
+            ? { ...d, status: event.status as Deployment['status'], error_message: event.error_message }
+            : d
+        ));
+      }
+      // Update service status
+      if (event.type === 'service_status' && event.service_id === service()?.id) {
+        setService(prev => prev ? { ...prev, status: event.status } : null);
+      }
+    }
+  );
 
   onMount(fetchData);
 
