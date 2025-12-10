@@ -71,12 +71,10 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		// Parse SSE format
+		// Parse SSE format - only print data lines
 		if strings.HasPrefix(line, "data: ") {
 			logLine := strings.TrimPrefix(line, "data: ")
 			fmt.Println(logLine)
-		} else if strings.HasPrefix(line, "event: ") {
-			// Handle events if needed
 		}
 	}
 
