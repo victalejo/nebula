@@ -144,7 +144,7 @@ func (s *DeployService) DeployImage(ctx context.Context, appID string, req Deplo
 	// Merge environment variables
 	env := make(map[string]string)
 	if project.Environment != "" {
-		json.Unmarshal([]byte(project.Environment), &env)
+		_ = json.Unmarshal([]byte(project.Environment), &env)
 	}
 	for k, v := range req.Environment {
 		env[k] = v
@@ -266,7 +266,7 @@ func (s *DeployService) DeployGit(ctx context.Context, appID string, req DeployG
 	// Merge environment variables
 	env := make(map[string]string)
 	if project.Environment != "" {
-		json.Unmarshal([]byte(project.Environment), &env)
+		_ = json.Unmarshal([]byte(project.Environment), &env)
 	}
 	for k, v := range req.Environment {
 		env[k] = v
@@ -347,7 +347,7 @@ func (s *DeployService) executeDeployment(
 	now := time.Now()
 	deployment.Status = string(deployer.StatusPreparing)
 	deployment.StartedAt = &now
-	s.store.Deployments().Update(ctx, deployment)
+	_ = s.store.Deployments().Update(ctx, deployment)
 	s.publishDeploymentStatus(project.ID, "", deployment.ID, deployment.Status, "")
 
 	// Prepare (pull image)
@@ -359,7 +359,7 @@ func (s *DeployService) executeDeployment(
 
 	// Update status to deploying
 	deployment.Status = string(deployer.StatusDeploying)
-	s.store.Deployments().Update(ctx, deployment)
+	_ = s.store.Deployments().Update(ctx, deployment)
 	s.publishDeploymentStatus(project.ID, "", deployment.ID, deployment.Status, "")
 
 	// Deploy (create and start container)
@@ -384,7 +384,7 @@ func (s *DeployService) executeDeployment(
 			Status:       "running",
 			Port:         port,
 		}
-		s.store.Containers().Create(ctx, container)
+		_ = s.store.Containers().Create(ctx, container)
 	}
 
 	// Health check
@@ -401,7 +401,7 @@ func (s *DeployService) executeDeployment(
 		s.failDeployment(ctx, deployment, project.ID, errors.New(errMsg))
 
 		// Cleanup failed deployment
-		dep.Destroy(ctx, result.ContainerIDs)
+		_ = dep.Destroy(ctx, result.ContainerIDs)
 		return
 	}
 
@@ -436,19 +436,19 @@ func (s *DeployService) executeDeployment(
 	finishedAt := time.Now()
 	deployment.Status = string(deployer.StatusRunning)
 	deployment.FinishedAt = &finishedAt
-	s.store.Deployments().Update(ctx, deployment)
+	_ = s.store.Deployments().Update(ctx, deployment)
 	s.publishDeploymentStatus(project.ID, "", deployment.ID, deployment.Status, "")
 
 	// Update route's active slot (legacy)
 	if route, _ := s.store.Routes().GetByAppID(ctx, project.ID); route != nil {
 		route.ActiveSlot = string(spec.TargetSlot)
-		s.store.Routes().Update(ctx, route)
+		_ = s.store.Routes().Update(ctx, route)
 	}
 
 	// Update domains' active slot
 	for _, domain := range domains {
 		domain.ActiveSlot = string(spec.TargetSlot)
-		s.store.Domains().Update(ctx, domain)
+		_ = s.store.Domains().Update(ctx, domain)
 	}
 
 	// Stop old deployment (if exists)
@@ -471,7 +471,7 @@ func (s *DeployService) failDeployment(ctx context.Context, deployment *storage.
 	deployment.Status = string(deployer.StatusFailed)
 	deployment.ErrorMessage = err.Error()
 	deployment.FinishedAt = &finishedAt
-	s.store.Deployments().Update(ctx, deployment)
+	_ = s.store.Deployments().Update(ctx, deployment)
 	s.publishDeploymentStatus(projectID, "", deployment.ID, deployment.Status, deployment.ErrorMessage)
 }
 
@@ -498,7 +498,7 @@ func (s *DeployService) stopOldDeployment(ctx context.Context, appID string, slo
 
 	// Update old deployment status
 	oldDeployment.Status = string(deployer.StatusStopped)
-	s.store.Deployments().Update(ctx, oldDeployment)
+	_ = s.store.Deployments().Update(ctx, oldDeployment)
 }
 
 // getTargetSlot determines which slot to deploy to
@@ -670,11 +670,11 @@ func (s *DeployService) DeployServiceByName(ctx context.Context, projectID, serv
 	// Merge environment variables
 	env := make(map[string]string)
 	if project.Environment != "" {
-		json.Unmarshal([]byte(project.Environment), &env)
+		_ = json.Unmarshal([]byte(project.Environment), &env)
 	}
 	if service.Environment != "" {
 		var svcEnv map[string]string
-		json.Unmarshal([]byte(service.Environment), &svcEnv)
+		_ = json.Unmarshal([]byte(service.Environment), &svcEnv)
 		for k, v := range svcEnv {
 			env[k] = v
 		}
@@ -767,7 +767,7 @@ func (s *DeployService) DeployServiceByName(ctx context.Context, projectID, serv
 
 	// Update service status to building
 	service.Status = "building"
-	s.store.Services().Update(ctx, service)
+	_ = s.store.Services().Update(ctx, service)
 	s.publishServiceStatus(project.ID, service.ID, service.Status)
 
 	// Execute deployment asynchronously
@@ -879,7 +879,7 @@ func (s *DeployService) deployDatabaseService(ctx context.Context, project *stor
 	}
 
 	// Save connection info to service
-	s.store.Services().Update(ctx, service)
+	_ = s.store.Services().Update(ctx, service)
 
 	// Merge with request environment
 	for k, v := range req.Environment {
@@ -929,7 +929,7 @@ func (s *DeployService) deployDatabaseService(ctx context.Context, project *stor
 	// Update service status
 	service.Status = "building"
 	service.Port = port
-	s.store.Services().Update(ctx, service)
+	_ = s.store.Services().Update(ctx, service)
 	s.publishServiceStatus(project.ID, service.ID, service.Status)
 
 	// Execute deployment asynchronously
@@ -964,7 +964,7 @@ func (s *DeployService) executeServiceDeployment(
 	now := time.Now()
 	deployment.Status = string(deployer.StatusPreparing)
 	deployment.StartedAt = &now
-	s.store.Deployments().Update(ctx, deployment)
+	_ = s.store.Deployments().Update(ctx, deployment)
 	s.publishDeploymentStatus(project.ID, service.ID, deployment.ID, deployment.Status, "")
 
 	// Prepare (pull image)
@@ -976,7 +976,7 @@ func (s *DeployService) executeServiceDeployment(
 
 	// Update status to deploying
 	deployment.Status = string(deployer.StatusDeploying)
-	s.store.Deployments().Update(ctx, deployment)
+	_ = s.store.Deployments().Update(ctx, deployment)
 	s.publishDeploymentStatus(project.ID, service.ID, deployment.ID, deployment.Status, "")
 
 	// Deploy (create and start container)
@@ -1001,7 +1001,7 @@ func (s *DeployService) executeServiceDeployment(
 			Status:       "running",
 			Port:         port,
 		}
-		s.store.Containers().Create(ctx, container)
+		_ = s.store.Containers().Create(ctx, container)
 	}
 
 	// Health check
@@ -1018,7 +1018,7 @@ func (s *DeployService) executeServiceDeployment(
 		s.failServiceDeployment(ctx, project.ID, service, deployment, errors.New(errMsg))
 
 		// Cleanup failed deployment
-		dep.Destroy(ctx, result.ContainerIDs)
+		_ = dep.Destroy(ctx, result.ContainerIDs)
 		return
 	}
 
@@ -1026,12 +1026,12 @@ func (s *DeployService) executeServiceDeployment(
 	finishedAt := time.Now()
 	deployment.Status = string(deployer.StatusRunning)
 	deployment.FinishedAt = &finishedAt
-	s.store.Deployments().Update(ctx, deployment)
+	_ = s.store.Deployments().Update(ctx, deployment)
 	s.publishDeploymentStatus(project.ID, service.ID, deployment.ID, deployment.Status, "")
 
 	// Update service status
 	service.Status = "running"
-	s.store.Services().Update(ctx, service)
+	_ = s.store.Services().Update(ctx, service)
 	s.publishServiceStatus(project.ID, service.ID, service.Status)
 
 	// Stop old deployment for this service
@@ -1055,11 +1055,11 @@ func (s *DeployService) failServiceDeployment(ctx context.Context, projectID str
 	deployment.Status = string(deployer.StatusFailed)
 	deployment.ErrorMessage = err.Error()
 	deployment.FinishedAt = &finishedAt
-	s.store.Deployments().Update(ctx, deployment)
+	_ = s.store.Deployments().Update(ctx, deployment)
 	s.publishDeploymentStatus(projectID, service.ID, deployment.ID, deployment.Status, deployment.ErrorMessage)
 
 	service.Status = "failed"
-	s.store.Services().Update(ctx, service)
+	_ = s.store.Services().Update(ctx, service)
 	s.publishServiceStatus(projectID, service.ID, service.Status)
 }
 
@@ -1121,7 +1121,7 @@ func (s *DeployService) stopOldServiceDeployment(ctx context.Context, serviceID 
 	}
 
 	oldDeployment.Status = string(deployer.StatusStopped)
-	s.store.Deployments().Update(ctx, oldDeployment)
+	_ = s.store.Deployments().Update(ctx, oldDeployment)
 }
 
 // publishDeploymentStatus publishes a deployment status change event

@@ -217,8 +217,8 @@ func (d *Deployer) Deploy(ctx context.Context, spec *deployer.DeploymentSpec) (*
 				parts := strings.Split(port, ":")
 				if len(parts) == 2 {
 					var hostPort, containerPort int
-					fmt.Sscanf(parts[0], "%d", &hostPort)
-					fmt.Sscanf(parts[1], "%d", &containerPort)
+					_, _ = fmt.Sscanf(parts[0], "%d", &hostPort)
+					_, _ = fmt.Sscanf(parts[1], "%d", &containerPort)
 					if containerPort > 0 {
 						config.Ports = append(config.Ports, container.PortMapping{
 							HostPort:      0, // Let Docker assign

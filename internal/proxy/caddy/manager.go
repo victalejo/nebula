@@ -204,7 +204,7 @@ func (m *Manager) GetRoute(ctx context.Context, domain string) (*proxy.Route, er
 						dial := route.Handle[0].Upstreams[0].Dial
 						var host string
 						var port int
-						fmt.Sscanf(dial, "%s:%d", &host, &port)
+						_, _ = fmt.Sscanf(dial, "%s:%d", &host, &port)
 						upstream = &proxy.Upstream{Host: host, Port: port}
 					}
 
@@ -237,7 +237,7 @@ func (m *Manager) ListRoutes(ctx context.Context) ([]proxy.Route, error) {
 					dial := route.Handle[0].Upstreams[0].Dial
 					var h string
 					var p int
-					fmt.Sscanf(dial, "%s:%d", &h, &p)
+					_, _ = fmt.Sscanf(dial, "%s:%d", &h, &p)
 					upstream = &proxy.Upstream{Host: h, Port: p}
 				}
 

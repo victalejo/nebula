@@ -391,7 +391,7 @@ func getDataPath(dbType DatabaseType) string {
 
 func generatePassword(length int) string {
 	bytes := make([]byte, length/2)
-	rand.Read(bytes)
+	_, _ = rand.Read(bytes)
 	return hex.EncodeToString(bytes)
 }
 

@@ -36,8 +36,8 @@ func init() {
 	deployImageCmd.Flags().StringP("registry-password", "", "", "Registry password")
 	deployImageCmd.Flags().StringSliceP("env", "e", []string{}, "Environment variables (KEY=VALUE)")
 
-	deployImageCmd.MarkFlagRequired("image")
-	deployImageCmd.MarkFlagRequired("port")
+	_ = deployImageCmd.MarkFlagRequired("image")
+	_ = deployImageCmd.MarkFlagRequired("port")
 }
 
 // Deployment represents a deployment response

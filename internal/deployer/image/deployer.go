@@ -159,7 +159,7 @@ func (d *Deployer) Deploy(ctx context.Context, spec *deployer.DeploymentSpec) (*
 	// Start container
 	if err := d.runtime.StartContainer(ctx, containerID); err != nil {
 		// Cleanup on failure
-		d.runtime.RemoveContainer(ctx, containerID, true)
+		_ = d.runtime.RemoveContainer(ctx, containerID, true)
 		return nil, fmt.Errorf("failed to start container: %w", err)
 	}
 

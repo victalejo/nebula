@@ -238,7 +238,7 @@ func (s *AppService) Delete(ctx context.Context, idOrName string) error {
 func (s *AppService) toResponse(ctx context.Context, project *storage.Project) *AppResponse {
 	var env map[string]string
 	if project.Environment != "" {
-		json.Unmarshal([]byte(project.Environment), &env)
+		_ = json.Unmarshal([]byte(project.Environment), &env)
 	}
 
 	response := &AppResponse{

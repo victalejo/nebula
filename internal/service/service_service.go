@@ -349,7 +349,7 @@ func (s *ServiceService) resolveProject(ctx context.Context, projectIDOrName str
 func (s *ServiceService) toResponse(service *storage.Service) *ServiceResponse {
 	var env map[string]string
 	if service.Environment != "" {
-		json.Unmarshal([]byte(service.Environment), &env)
+		_ = json.Unmarshal([]byte(service.Environment), &env)
 	}
 
 	return &ServiceResponse{

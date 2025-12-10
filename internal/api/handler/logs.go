@@ -3,7 +3,6 @@ package handler
 import (
 	"bufio"
 	"io"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -97,12 +96,6 @@ func (h *LogHandler) StreamDeploymentLogs(c *gin.Context) {
 	// Stream logs from first container (usually there's only one per deployment)
 	container := containers[0]
 	h.log.Info("streaming logs from container", "container_id", container.ContainerID, "deployment_id", deploymentID)
-
-	// Convert tail to int to validate
-	tailNum, _ := strconv.Atoi(tailStr)
-	if tailNum <= 0 {
-		tailNum = 100
-	}
 
 	// Get logs from Docker
 	logReader, err := h.runtime.ContainerLogs(c.Request.Context(), container.ContainerID, nebulacontainer.LogOptions{

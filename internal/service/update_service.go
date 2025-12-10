@@ -645,7 +645,7 @@ func (s *UpdateService) saveRestartState() {
 	executable, _ := os.Executable()
 	dir := filepath.Dir(executable)
 	stateFile := filepath.Join(dir, updateStateFile)
-	os.WriteFile(stateFile, []byte("pending"), 0644)
+	_ = os.WriteFile(stateFile, []byte("pending"), 0644)
 }
 
 func (s *UpdateService) restart(executable string) {

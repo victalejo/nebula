@@ -41,8 +41,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&serverURL, "server", "", "Nebula server URL")
 	rootCmd.PersistentFlags().StringVar(&token, "token", "", "Authentication token")
 
-	viper.BindPFlag("server", rootCmd.PersistentFlags().Lookup("server"))
-	viper.BindPFlag("token", rootCmd.PersistentFlags().Lookup("token"))
+	_ = viper.BindPFlag("server", rootCmd.PersistentFlags().Lookup("server"))
+	_ = viper.BindPFlag("token", rootCmd.PersistentFlags().Lookup("token"))
 }
 
 func initConfig() {
@@ -68,7 +68,7 @@ func initConfig() {
 	viper.SetEnvPrefix("NEBULA")
 	viper.AutomaticEnv()
 
-	viper.ReadInConfig()
+	_ = viper.ReadInConfig()
 }
 
 // GetServerURL returns the configured server URL

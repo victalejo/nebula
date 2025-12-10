@@ -145,7 +145,7 @@ func (s *Store) Migrate() error {
 	}
 	for _, col := range v2Columns {
 		// Ignore errors - column might already exist
-		s.db.Exec(col)
+		_, _ = s.db.Exec(col)
 	}
 
 	// Run V3 migration (new architecture: projects, services, domains)
@@ -171,11 +171,11 @@ func (s *Store) Migrate() error {
 		"ALTER TABLE services ADD COLUMN database_exposed INTEGER DEFAULT 0",
 	}
 	for _, alt := range v3Alterations {
-		s.db.Exec(alt)
+		_, _ = s.db.Exec(alt)
 	}
 
 	// Create index on service_id after column is added
-	s.db.Exec("CREATE INDEX IF NOT EXISTS idx_deployments_service_id ON deployments(service_id)")
+	_, _ = s.db.Exec("CREATE INDEX IF NOT EXISTS idx_deployments_service_id ON deployments(service_id)")
 
 	return nil
 }

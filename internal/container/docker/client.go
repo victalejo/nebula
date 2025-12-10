@@ -200,7 +200,7 @@ func (c *Client) CreateContainer(ctx context.Context, config nebulacontainer.Con
 	for i := 1; i < len(config.Networks); i++ {
 		if err := c.ConnectToNetwork(ctx, resp.ID, config.Networks[i]); err != nil {
 			// Cleanup on error
-			c.RemoveContainer(ctx, resp.ID, true)
+			_ = c.RemoveContainer(ctx, resp.ID, true)
 			return "", err
 		}
 	}
@@ -458,6 +458,6 @@ func (c *Client) Close() error {
 
 func parsePort(s string) int {
 	var port int
-	fmt.Sscanf(s, "%d", &port)
+	_, _ = fmt.Sscanf(s, "%d", &port)
 	return port
 }
