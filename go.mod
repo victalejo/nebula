@@ -1,6 +1,6 @@
 module github.com/victalejo/nebula
 
-go 1.25.2
+go 1.23
 
 require (
 	github.com/docker/docker v28.5.2+incompatible
