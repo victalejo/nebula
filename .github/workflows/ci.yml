@@ -23,6 +23,19 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: web
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: web
+
       - name: Run tests
         run: go test -v ./...
 

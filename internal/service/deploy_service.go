@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -397,7 +398,7 @@ func (s *DeployService) executeDeployment(
 		// Capture logs before destroying the container
 		deployment.Logs = s.captureContainerLogs(ctx, result.ContainerIDs)
 
-		s.failDeployment(ctx, deployment, project.ID, fmt.Errorf(errMsg))
+		s.failDeployment(ctx, deployment, project.ID, errors.New(errMsg))
 
 		// Cleanup failed deployment
 		dep.Destroy(ctx, result.ContainerIDs)
@@ -1014,7 +1015,7 @@ func (s *DeployService) executeServiceDeployment(
 		// Capture logs before destroying the container
 		deployment.Logs = s.captureContainerLogs(ctx, result.ContainerIDs)
 
-		s.failServiceDeployment(ctx, project.ID, service, deployment, fmt.Errorf(errMsg))
+		s.failServiceDeployment(ctx, project.ID, service, deployment, errors.New(errMsg))
 
 		// Cleanup failed deployment
 		dep.Destroy(ctx, result.ContainerIDs)
