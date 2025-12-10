@@ -1,0 +1,11 @@
+linters-settings:
+  staticcheck:
+    checks:
+      - "all"
+      - "-SA4017"  # HasPrefix false positive in multi-line conditions
+
+linters:
+  enable:
+    - errcheck
+    - staticcheck
+    - ineffassign
