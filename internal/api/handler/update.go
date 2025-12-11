@@ -83,7 +83,13 @@ func (h *UpdateHandler) ApplyUpdate(c *gin.Context) {
 
 	// Start the download and apply process asynchronously
 	go func() {
-		if err := h.updateService.DownloadAndApply(context.Background()); err != nil {
+		ctx := context.Background()
+		if err := h.updateService.DownloadAndApply(ctx); err != nil {
+			h.log.Error("failed to download update", "error", err)
+			return
+		}
+		// Apply the update regardless of mode (user explicitly requested it)
+		if err := h.updateService.ApplyUpdate(ctx); err != nil {
 			h.log.Error("failed to apply update", "error", err)
 		}
 	}()
