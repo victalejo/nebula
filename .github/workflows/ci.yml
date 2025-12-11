@@ -119,6 +119,9 @@ jobs:
           git tag -a ${{ steps.next_version.outputs.version }} -m "Release ${{ steps.next_version.outputs.version }}"
           git push origin ${{ steps.next_version.outputs.version }}
 
+      - name: Fetch tags
+        run: git fetch --tags
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
