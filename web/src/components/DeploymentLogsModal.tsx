@@ -20,6 +20,7 @@ const DeploymentLogsModal: Component<DeploymentLogsModalProps> = (props) => {
   const [connected, setConnected] = createSignal(false);
   const [autoScroll, setAutoScroll] = createSignal(true);
   const [filter, setFilter] = createSignal('');
+  const [copied, setCopied] = createSignal(false);
   let logContainer: HTMLDivElement | undefined;
   let eventSource: EventSource | null = null;
   let logId = 0;
@@ -99,6 +100,13 @@ const DeploymentLogsModal: Component<DeploymentLogsModalProps> = (props) => {
     setLogs([]);
   };
 
+  const copyLogs = async () => {
+    const text = logs().map(l => `${new Date(l.timestamp).toLocaleTimeString()} ${l.message}`).join('\n');
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   onMount(connect);
 
   onCleanup(() => {
@@ -160,6 +168,13 @@ const DeploymentLogsModal: Component<DeploymentLogsModalProps> = (props) => {
               />
               <span>Auto-scroll</span>
             </label>
+            <button
+              onClick={copyLogs}
+              class={`text-sm ${copied() ? 'text-green-500' : 'text-gray-500 hover:text-gray-700'}`}
+              title="Copiar logs"
+            >
+              {copied() ? 'Copiado!' : 'Copiar'}
+            </button>
             <button
               onClick={clearLogs}
               class="text-sm text-gray-500 hover:text-gray-700"

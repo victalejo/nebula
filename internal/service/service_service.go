@@ -300,7 +300,22 @@ func (s *ServiceService) Delete(ctx context.Context, projectID, serviceName stri
 		return apperrors.NewNotFoundError("service", serviceName)
 	}
 
-	// TODO: Stop and remove containers
+	// Delete related deployments and containers
+	deployments, err := s.store.Deployments().ListByServiceID(ctx, service.ID)
+	if err != nil {
+		return apperrors.NewInternalError("failed to list deployments", err)
+	}
+
+	for _, d := range deployments {
+		// Delete containers for this deployment
+		if err := s.store.Containers().DeleteByDeploymentID(ctx, d.ID); err != nil {
+			s.log.Warn("failed to delete containers for deployment", "deploymentID", d.ID, "error", err)
+		}
+		// Delete the deployment
+		if err := s.store.Deployments().Delete(ctx, d.ID); err != nil {
+			s.log.Warn("failed to delete deployment", "deploymentID", d.ID, "error", err)
+		}
+	}
 
 	if err := s.store.Services().Delete(ctx, service.ID); err != nil {
 		return apperrors.NewInternalError("failed to delete service", err)
