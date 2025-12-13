@@ -89,6 +89,9 @@ func main() {
 	// Initialize event bus for real-time status updates
 	eventBus := events.NewEventBus()
 
+	// Initialize notification service for WhatsApp alerts
+	notificationService := service.NewNotificationService(eventBus, log)
+
 	// Initialize services
 	appService := service.NewAppService(store, log)
 	serviceService := service.NewServiceService(store, log)
@@ -108,6 +111,9 @@ func main() {
 
 	// Start background update checker
 	go updateService.StartBackgroundChecker(context.Background())
+
+	// Start notification service for WhatsApp deployment alerts
+	notificationService.Start(context.Background())
 
 	// Start server
 	go func() {
