@@ -1,6 +1,7 @@
 import { Component, createSignal, onMount, For, Show, createMemo } from 'solid-js';
 import api, { Service, Deployment, StatusEvent } from '../api/client';
 import DeploymentLogsModal from '../components/DeploymentLogsModal';
+import EditEnvVarsModal from '../components/EditEnvVarsModal';
 import { useProjectStatusStream } from '../hooks/useStatusStream';
 
 interface ServiceDetailProps {
@@ -18,6 +19,7 @@ const ServiceDetail: Component<ServiceDetailProps> = (props) => {
   const [selectedDeployment, setSelectedDeployment] = createSignal<Deployment | null>(null);
   const [showPassword, setShowPassword] = createSignal(false);
   const [copiedField, setCopiedField] = createSignal<string | null>(null);
+  const [showEnvModal, setShowEnvModal] = createSignal(false);
 
   const fetchData = async () => {
     try {
@@ -141,6 +143,13 @@ const ServiceDetail: Component<ServiceDetailProps> = (props) => {
     }
   };
 
+  const handleSaveEnvVars = async (env: Record<string, string>) => {
+    await api.updateService(props.projectId, props.serviceName, { environment: env });
+    // Refresh service data
+    const updatedService = await api.getService(props.projectId, props.serviceName);
+    setService(updatedService);
+  };
+
   return (
     <Show when={!loading()} fallback={<LoadingSkeleton />}>
       <Show when={service()}>
@@ -232,6 +241,40 @@ const ServiceDetail: Component<ServiceDetailProps> = (props) => {
                 </div>
               )}
             </dl>
+          </div>
+
+          {/* Environment Variables Section */}
+          <div class="card mb-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-semibold text-gray-900">Variables de Entorno</h3>
+              <button
+                type="button"
+                onClick={() => setShowEnvModal(true)}
+                class="text-sm text-nebula-600 hover:text-nebula-700 font-medium"
+              >
+                Editar
+              </button>
+            </div>
+            <Show
+              when={Object.keys(service()!.environment || {}).length > 0}
+              fallback={
+                <p class="text-gray-400 text-sm">No hay variables de entorno configuradas</p>
+              }
+            >
+              <div class="space-y-2">
+                <For each={Object.entries(service()!.environment || {})}>
+                  {([key, value]) => (
+                    <div class="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+                      <span class="font-mono text-sm text-gray-700">{key}</span>
+                      <span class="font-mono text-sm text-gray-400">••••••••</span>
+                    </div>
+                  )}
+                </For>
+              </div>
+              <p class="text-xs text-gray-500 mt-3">
+                Los valores se ocultan por seguridad. Haz clic en "Editar" para ver o modificar.
+              </p>
+            </Show>
           </div>
 
           {/* Database Connection Info */}
@@ -470,6 +513,15 @@ const ServiceDetail: Component<ServiceDetailProps> = (props) => {
               deploymentId={selectedDeployment()!.id}
               deploymentVersion={selectedDeployment()!.version}
               onClose={() => setSelectedDeployment(null)}
+            />
+          </Show>
+
+          {/* Edit Environment Variables Modal */}
+          <Show when={showEnvModal()}>
+            <EditEnvVarsModal
+              environment={service()!.environment || {}}
+              onSave={handleSaveEnvVars}
+              onClose={() => setShowEnvModal(false)}
             />
           </Show>
         </div>
